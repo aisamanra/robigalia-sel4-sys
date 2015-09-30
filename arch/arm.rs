@@ -9,21 +9,30 @@
  * @TAG(NICTA_BSD)
  */
 
+pub const seL4_WordBits: usize = 32;
+pub const seL4_PageBits: usize = 12;
+pub const seL4_SlotBits: usize = 4;
+pub const seL4_TCBBits: usize = 9;
+pub const seL4_EndpointBits: usize = 4;
+pub const seL4_PageTableBits: usize = 10;
+pub const seL4_PageDirBits: usize = 14;
+pub const seL4_ASIDPoolBits: usize = 12;
+
+pub const seL4_Frame_Args: usize = 4;
+pub const seL4_Frame_MRs: usize = 7;
+pub const seL4_Frame_HasNPC: usize = 0;
+pub const seL4_ASIDPoolBits: usize = 12;
+pub const seL4_ASIDPoolBits: usize = 12;
+pub const seL4_ASIDPoolBits: usize = 12;
+
 pub type seL4_Word = u32;
 pub type seL4_CPtr = seL4_Word;
 
+pub type seL4_ARM_Page = seL4_CPtr;
+pub type seL4_ARM_PageTable = seL4_CPtr;
+pub type seL4_ARM_PageDirectory = seL4_CPtr;
 pub type seL4_ARM_ASIDControl = seL4_CPtr;
 pub type seL4_ARM_ASIDPool = seL4_CPtr;
-pub type seL4_ARM_Page = seL4_CPtr;
-pub type seL4_ARM_PageDirectory = seL4_CPtr;
-pub type seL4_ARM_PageTable = seL4_CPtr;
-
-pub type seL4_CNode = seL4_CPtr;
-pub type seL4_IRQHandler = seL4_CPtr;
-pub type seL4_IRQControl = seL4_CPtr;
-pub type seL4_TCB = seL4_CPtr;
-pub type seL4_Untyped = seL4_CPtr;
-pub type seL4_DomainSet = seL4_CPtr;
 
 pub struct seL4_UserContext {
     pub pc: seL4_Word,
@@ -45,6 +54,21 @@ pub struct seL4_UserContext {
     pub r14: seL4_Word,
 }
 
+#[repr(u32)]
+pub enum seL4_ARM_VMAttributes {
+    PageCacheable = 1,
+    ParityEnabled = 2,
+    Default_VMAttributes = 3,
+    ExecuteNever = 4,
+}
+
+pub type seL4_CNode = seL4_CPtr;
+pub type seL4_IRQHandler = seL4_CPtr;
+pub type seL4_IRQControl = seL4_CPtr;
+pub type seL4_TCB = seL4_CPtr;
+pub type seL4_Untyped = seL4_CPtr;
+pub type seL4_DomainSet = seL4_CPtr;
+
 pub const seL4_MsgLengthBits: usize = 7;
 pub const seL4_MsgMaxLength: usize = 120;
 pub const seL4_MsgExtraCapBits: usize = 2;
@@ -60,14 +84,6 @@ pub struct seL4_IPCBuffer {
     pub receiveDepth: seL4_CPtr,
 }
 
-pub const Default_VMAttributes: usize = 3;
-pub enum seL4_ARM_VMAttributes {
-    PageCacheable = 1,
-    ParityEnabled = 2,
-    CacheDisabled = 2,
-    ExecuteNever = 4,
-}
-
 pub enum seL4_CapRights {
     CanWrite = 0x01,
     CanRead = 0x02,
@@ -76,79 +92,70 @@ pub enum seL4_CapRights {
 }
 
 #[inline(always)]
+pub unsafe fn seL4_GetIPCBuffer() -> *mut seL4_IPCBuffer {
+	*(0xffffc000 as *mut *mut seL4_IPCBuffer)
+}
+
+#[inline(always)]
 pub unsafe fn seL4_GetTag() -> seL4_MessageInfo {
-    let mut tag: seL4_MessageInfo = ::core::mem::uninitialized();
-    asm!("movl %gs:0, $0" : "=r"(tag.words[0]) : : : "volatile");
-    tag
+	(*seL4_GetIPCBuffer()).tag
 }
 
 #[inline(always)]
 pub unsafe fn seL4_SetTag(tag: seL4_MessageInfo) {
-    asm!("movl $0, %gs:0" : : "r"(tag.words[0]) : "memory" : "volatile");
+	(*seL4_GetIPCBuffer()).tag = tag;
 }
 
 #[inline(always)]
 pub unsafe fn seL4_GetMR(regnum: isize) -> seL4_Word {
-    let mr;
-    asm!("movl %gs:4(,$1,0x4), $0" : "=r"(mr) : "r"(regnum) : : "volatile");
-    mr
+	(*seL4_GetIPCBuffer()).msg[regnum]	
 }
 
 #[inline(always)]
 pub unsafe fn seL4_SetMR(regnum: isize, value: seL4_Word) {
-    asm!("movl $0, %gs:4(,$1,0x4)" : : "r"(value), "r"(regnum) : "memory" : "volatile");
+	(*seL4_GetIPCBuffer()).msg[regnum] = value;
 }
 
 #[inline(always)]
 pub unsafe fn seL4_GetUserData() -> seL4_Word {
-    let data;
-    asm!("movl %gs:484, $0" : "=r"(data) : : : "volatile");
-    data
-}
-
-#[inline(always)]
-pub unsafe fn seL4_GetIPCBuffer() -> *mut seL4_IPCBuffer {
-    seL4_GetUserData() as isize as *mut seL4_IPCBuffer
+	(*seL4_GetIPCBuffer()).userData	
 }
 
 #[inline(always)]
 pub unsafe fn seL4_SetUserData(data: seL4_Word) {
-    asm!("movl $0, %gs:484" : : "r"(data) : "memory" : "volatile");
+	(*seL4_GetIPCBuffer()).userData = data;	
 }
 
 #[inline(always)]
 pub unsafe fn seL4_GetBadge(index: isize) -> seL4_CapData {
-    let mut badge: seL4_CapData = ::core::mem::uninitialized();
-    asm!("movl %gs:488(,$1,0x4), $0" : "=r"(badge.words[0]) : "r"(index) : : "volatile");
-    badge
+	(*seL4_GetIPCBuffer()).caps_or_badges[index] as seL4_CapData
 }
 
 #[inline(always)]
 pub unsafe fn seL4_GetCap(index: isize) -> seL4_CPtr {
-    let cptr;
-    asm!("movl %gs:488(,$1,0x4), $0" : "=r"(cptr) : "r"(index) : : "volatile");
-    cptr
+	(*seL4_GetIPCBuffer()).caps_or_badges[index] as seL4_CPtr
 }
 
 #[inline(always)]
 pub unsafe fn seL4_SetCap(index: isize, cptr: seL4_CPtr) {
-    asm!("movl $0, %gs:488(,$1,0x4)" : : "r"(cptr), "r"(index) : "memory" : "volatile");
+	(*seL4_GetIPCBuffer()).caps_or_badges[index] = cptr as seL4_Word;
 }
 
 #[inline(always)]
 pub unsafe fn seL4_GetCapReceivePath(receiveCNode: *mut seL4_CPtr,
                                      receiveIndex: *mut seL4_CPtr,
                                      receiveDepth: *mut seL4_Word) {
+    let ipcbuffer = seL4_GetIPCBuffer();
     if !receiveCNode.is_null() {
-        asm!("movl %gs:500, $0" : "=r"(*receiveCNode) : : : "volatile");
+	*receiveCNode = (*ipcbuffer).receiveCNode;
     }
 
     if !receiveIndex.is_null() {
-        asm!("movl %gs:504, $0" : "=r"(*receiveIndex) : : : "volatile");
+	*receiveIndex = (*ipcbuffer).receiveIndex;
     }
 
     if !receiveDepth.is_null() {
-        asm!("movl %gs:508, $0" : "=r"(*receiveDepth) : : : "volatile");
+	*receiveDepth = (*ipcbuffer).receiveDepth;
     }
 }
 
@@ -156,27 +163,35 @@ pub unsafe fn seL4_GetCapReceivePath(receiveCNode: *mut seL4_CPtr,
 pub unsafe fn seL4_SetCapReceivePath(receiveCNode: seL4_CPtr,
                                      receiveIndex: seL4_CPtr,
                                      receiveDepth: seL4_Word) {
-    asm!("movl $0, %gs:500" : : "r"(receiveCNode) : "memory" : "volatile");
-    asm!("movl $0, %gs:504" : : "r"(receiveIndex) : "memory" : "volatile");
-    asm!("movl $0, %gs:508" : : "r"(receiveDepth) : "memory" : "volatile");
+	let ipcbuffer = seL4_GetIPCBuffer();
+	(*ipcbuffer).receiveCNode = receiveCNode;
+	(*ipcbuffer).receiveIndex = receiveIndex;
+	(*ipcbuffer).receiveDepth = receiveDepth;
+}
+
+macro_rules! swinum {
+	($val:expr) => {
+		$val as seL4_Word & 0x00ffffff
+	}
 }
 
 #[inline(always)]
 pub unsafe fn seL4_Send(dest: seL4_CPtr, msgInfo: seL4_MessageInfo) {
-    asm!("pushl %ebp
-          movl %ecx, %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          popl %ebp"
-        :
-        : "a" (SyscallId::Send as seL4_Word),
-        "b" (dest),
-          "S" (msgInfo.words[0]),
-          "D" (seL4_GetMR(0)),
-          "c" (seL4_GetMR(1))
-          : "%edx"
+	let info  = msgInfo.words[0];
+	let msg0 = seL4_GetMR(0);
+	let msg1 = seL4_GetMR(1);
+	let msg2 = seL4_GetMR(2);
+	let msg3 = seL4_GetMR(3);
+	let scno = SyscallId::Send as seL4_Word;
+    asm!("swi $0"
+	:
+	: "i" (swinum!(SyscallId::Send)),
+	  "{r0}" (dest), 
+	  "{r1}" (msgInfo.words[0]),
+	  "{r2}" (msg0), "{r3}" (msg1),
+	  "{r4}" (msg2), "{r5}" (msg3),
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 }
 
@@ -201,332 +216,340 @@ macro_rules! opt_assign {
 #[inline(always)]
 pub unsafe fn seL4_SendWithMRs(dest: seL4_CPtr, msgInfo: seL4_MessageInfo,
                                mr0: *mut seL4_Word, mr1: *mut seL4_Word) {
-    asm!("pushl %ebp
-          movl %ecx, %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          popl %ebp"
-        :
-        : "a" (SyscallId::Send as seL4_Word),
-        "b" (dest),
-          "S" (msgInfo.words[0]),
-          "D" (opt_deref!(mr0)),
-          "c" (opt_deref!(mr1))
-          : "%edx"
+	let info  = msgInfo.words[0];
+	let mut msg0 = ::core::mem::uninitialized();
+	let mut msg1 = ::core::mem::uninitialized();
+	let mut msg2 = ::core::mem::uninitialized();
+	let mut msg3 = ::core::mem::uninitialized();
+
+	if !mr.is_null() && seL4_MessageInfo.get_length(msgInfo) > 0 {
+		msg0 = *mr0;
+	}
+	if !mr.is_null() && seL4_MessageInfo.get_length(msgInfo) > 1 {
+		msg1 = *mr1;
+	}
+	if !mr.is_null() && seL4_MessageInfo.get_length(msgInfo) > 2 {
+		msg2 = *mr2;
+	}
+	if !mr.is_null() && seL4_MessageInfo.get_length(msgInfo) > 3 {
+		msg3 = *mr3;
+	}
+	let scno = SyscallId::Send as seL4_Word;
+    asm!("swi $0"
+	:
+	: "i" (swinum!(SyscallId::Send)),
+	  "{r0}" (dest), 
+	  "{r1}" (msgInfo.words[0]),
+	  "{r2}" (msg0), "{r3}" (msg1),
+	  "{r4}" (msg2), "{r5}" (msg3),
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 }
 
 #[inline(always)]
 pub unsafe fn seL4_NBSend(dest: seL4_CPtr, msgInfo: seL4_MessageInfo) {
-    asm!("pushl %ebp
-          movl %ecx, %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          popl %ebp"
-        :
-        : "a" (SyscallId::NBSend as seL4_Word),
-        "b" (dest)
-          "S" (msgInfo.words[0]),
-          "D" (seL4_GetMR(0)),
-          "c" (seL4_GetMR(1))
-          : "%edx"
+	let info  = msgInfo.words[0];
+	let msg0 = seL4_GetMR(0);
+	let msg1 = seL4_GetMR(1);
+	let msg2 = seL4_GetMR(2);
+	let msg3 = seL4_GetMR(3);
+	let scno = SyscallId::NBSend as seL4_Word;
+    asm!("swi $0"
+	:
+	: "i" (swinum!(SyscallId::NBSend)),
+	  "{r0}" (dest), 
+	  "{r1}" (msgInfo.words[0]),
+	  "{r2}" (msg0), "{r3}" (msg1),
+	  "{r4}" (msg2), "{r5}" (msg3),
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 }
 #[inline(always)]
 pub unsafe fn seL4_NBSendWithMRs(dest: seL4_CPtr, msgInfo: seL4_MessageInfo,
                                  mr0: *mut seL4_Word, mr1: *mut seL4_Word) {
-    asm!("pushl %ebp
-          movl %ecx, %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          popl %ebp"
-        :
-        : "a" (SyscallId::NBSend as seL4_Word),
-        "b" (dest),
-          "S" (msgInfo.words[0]),
-          "D" (opt_deref!(mr0)),
-          "c" (opt_deref!(mr1))
-          : "%edx"
+	let info  = msgInfo.words[0];
+	let mut msg0 = ::core::mem::uninitialized();
+	let mut msg1 = ::core::mem::uninitialized();
+	let mut msg2 = ::core::mem::uninitialized();
+	let mut msg3 = ::core::mem::uninitialized();
+
+	if !mr.is_null() && seL4_MessageInfo.get_length(msgInfo) > 0 {
+		msg0 = *mr0;
+	}
+	if !mr.is_null() && seL4_MessageInfo.get_length(msgInfo) > 1 {
+		msg1 = *mr1;
+	}
+	if !mr.is_null() && seL4_MessageInfo.get_length(msgInfo) > 2 {
+		msg2 = *mr2;
+	}
+	if !mr.is_null() && seL4_MessageInfo.get_length(msgInfo) > 3 {
+		msg3 = *mr3;
+	}
+	let scno = SyscallId::NBSend as seL4_Word;
+    asm!("swi $0"
+	:
+	: "i" (swinum!(SyscallId::NBSend)),
+	  "{r0}" (dest), 
+	  "{r1}" (msgInfo.words[0]),
+	  "{r2}" (msg0), "{r3}" (msg1),
+	  "{r4}" (msg2), "{r5}" (msg3),
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 }
 
 #[inline(always)]
 pub unsafe fn seL4_Reply(msgInfo: seL4_MessageInfo) {
-    asm!("pushl %ebp
-          movl %ecx, %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          popl %ebp"
-        :
-        : "a" (SyscallId::Reply as seL4_Word),
-        "S" (msgInfo.words[0])
-          "D" (seL4_GetMR(0)),
-          "c" (seL4_GetMR(1))
-        : "%ebx", "%edx"
+	let info  = msgInfo.words[0];
+	let msg0 = seL4_GetMR(0);
+	let msg1 = seL4_GetMR(1);
+	let msg2 = seL4_GetMR(2);
+	let msg3 = seL4_GetMR(3);
+	let scno = SyscallId::Reply as seL4_Word;
+    asm!("swi $0"
+	:
+	: "i" (swinum!(SyscallId::Reply)),
+	  "{r1}" (msgInfo.words[0]),
+	  "{r2}" (msg0), "{r3}" (msg1),
+	  "{r4}" (msg2), "{r5}" (msg3),
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 }
 #[inline(always)]
 pub unsafe fn seL4_ReplyWithMRs(msgInfo: seL4_MessageInfo,
                                 mr0: *mut seL4_Word, mr1: *mut seL4_Word) {
-    asm!("pushl %ebp
-          movl %ecx, %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          popl %ebp"
-        :
-        : "a" (SyscallId::Reply as seL4_Word),
-        "S" (msgInfo.words[0]),
-          "D" (opt_deref!(mr0))
-          "c" (opt_deref!(mr1))
-        : "%ebx", "%edx"
+	let info  = msgInfo.words[0];
+	let mut msg0 = ::core::mem::uninitialized();
+	let mut msg1 = ::core::mem::uninitialized();
+	let mut msg2 = ::core::mem::uninitialized();
+	let mut msg3 = ::core::mem::uninitialized();
+
+	if !mr.is_null() && seL4_MessageInfo.get_length(msgInfo) > 0 {
+		msg0 = *mr0;
+	}
+	if !mr.is_null() && seL4_MessageInfo.get_length(msgInfo) > 1 {
+		msg1 = *mr1;
+	}
+	if !mr.is_null() && seL4_MessageInfo.get_length(msgInfo) > 2 {
+		msg2 = *mr2;
+	}
+	if !mr.is_null() && seL4_MessageInfo.get_length(msgInfo) > 3 {
+		msg3 = *mr3;
+	}
+	let scno = SyscallId::Reply as seL4_Word;
+    asm!("swi $0"
+	:
+	: "i" (swinum!(SyscallId::Reply)),
+	  "{r1}" (msgInfo.words[0]),
+	  "{r2}" (msg0), "{r3}" (msg1),
+	  "{r4}" (msg2), "{r5}" (msg3),
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 }
 
 
 #[inline(always)]
 pub unsafe fn seL4_Notify(dest: seL4_CPtr, msg: seL4_Word) {
-    asm!("pushl %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          popl %ebp"
-        :
-        : "a" (SyscallId::Send as seL4_Word),
-        "b" (dest),
-          "S" (seL4_MessageInfo::new(0, 0, 0, 1).words[0]),
-          "D" (msg)
-        : "%ecx", "%edx"
+	let info  = seL4_MessageInfo::new(0, 0, 0, 1).words[0];
+	let scno = SyscallId::Send as seL4_Word;
+    asm!("swi $0"
+	:
+	: "i" (swinum!(SyscallId::Send)),
+	  "{r0}" (dest),
+	  "{r1}" (info),
+	  "{r2}" (msg)
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 }
 
 #[inline(always)]
 pub unsafe fn seL4_Wait(src: seL4_CPtr, sender: *mut seL4_Word) -> seL4_MessageInfo {
-    // ERROR: "Already initialized this value register!"
-    let mut info = seL4_MessageInfo { words: [0] };
-    let badge: seL4_Word;
-    let mr0: seL4_Word;
-    let mr1: seL4_Word;
-
-    asm!("pushl %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          movl %ebp, %ecx
-          popl %ebp"
-        : "=b" (badge),
-          "=S" (info.words[0]),
-          "=D" (mr0),
-          "=c" (mr1)
-        : "a" (SyscallId::Wait as seL4_Word),
-        "b" (src)
-        : "%edx", "memory"
+	let info = ::core::mem::uninitialized();
+	let msg0 = ::core::mem::uninitialized();
+	let msg1 = ::core::mem::uninitialized();
+	let msg2 = ::core::mem::uninitialized();
+	let msg3 = ::core::mem::uninitialized();
+	let scno = SyscallId::Wait as seL4_Word;
+    asm!("swi $0"
+	: "={r0}" (src), "={r1}" (info),
+	  "={r2}" (msg0), "={r3}" (msg1),
+	  "={r4}" (msg2), "={r5}" (msg3),
+	  "={r1}"
+	: "i" (swinum!(SyscallId::Wait)),
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 
-    seL4_SetMR(0, mr0);
-    seL4_SetMR(1, mr1);
+    seL4_SetMR(0, msg0);
+    seL4_SetMR(1, msg1);
+    seL4_SetMR(2, msg2);
+    seL4_SetMR(3, msg3);
 
-    opt_assign!(sender, badge);
-
-    ::core::mem::uninitialized()
+    opt_assign!(sender, src);
+    info
 }
 
 #[inline(always)]
 pub unsafe fn seL4_WaitWithMRs(src: seL4_CPtr, sender: *mut seL4_Word,
                                mr0: *mut seL4_Word, mr1: *mut seL4_Word) -> seL4_MessageInfo {
-    let mut info: seL4_MessageInfo = ::core::mem::uninitialized();
-    let badge: seL4_Word;
-    let msg0: seL4_Word;
-    let msg1: seL4_Word;
-
-    asm!("pushl %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          movl %ebp, %ecx
-          popl %ebp"
-        : "=b" (badge),
-        "=S" (info.words[0]),
-          "=D" (msg0),
-          "=c" (msg1)
-        : "a" (SyscallId::Wait as seL4_Word),
-        "b" (src)
-        : "%edx", "memory"
+	let info = ::core::mem::uninitialized();
+	let msg0 = ::core::mem::uninitialized();
+	let msg1 = ::core::mem::uninitialized();
+	let msg2 = ::core::mem::uninitialized();
+	let msg3 = ::core::mem::uninitialized();
+	let scno = SyscallId::Wait as seL4_Word;
+    asm!("swi $0"
+	: "={r0}" (src), "={r1}" (info),
+	  "={r2}" (msg0), "={r3}" (msg1),
+	  "={r4}" (msg2), "={r5}" (msg3),
+	  "={r1}"
+	: "i" (swinum!(SyscallId::Wait)),
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 
+    seL4_SetMR(0, msg0);
+    seL4_SetMR(1, msg1);
+    seL4_SetMR(2, msg2);
+    seL4_SetMR(3, msg3);
+
+    opt_assign!(sender, src);
     opt_assign!(mr0, msg0);
     opt_assign!(mr1, msg1);
-    opt_assign!(sender, badge);
-
+    opt_assign!(mr2, msg2);
+    opt_assign!(mr3, msg3);
     info
 }
 
 #[inline(always)]
 pub unsafe fn seL4_Call(mut dest: seL4_CPtr, msgInfo: seL4_MessageInfo) -> seL4_MessageInfo {
-    let mut info: seL4_MessageInfo = ::core::mem::uninitialized();
-    let mut mr0 = seL4_GetMR(0);
-    let mut mr1 = seL4_GetMR(1);
-
-    asm!("pushl %ebp
-          movl %ecx, %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          movl %ebp, %ecx
-          popl %ebp"
-        : "=S" (info.words[0]),
-        "=D" (mr0),
-          "=c" (mr1),
-          "=b" (dest) /* dummy, tells GCC that ebx is clobbered (check if necessary) */
-        : "a" (SyscallId::Call as seL4_Word),
-        "b" (dest),
-          "S" (msgInfo.words[0]),
-          "D" (mr0),
-          "c" (mr1)
-          : "%edx", "memory"
+	let info = ::core::mem::uninitialized();
+	let msg0 = ::core::mem::uninitialized();
+	let msg1 = ::core::mem::uninitialized();
+	let msg2 = ::core::mem::uninitialized();
+	let msg3 = ::core::mem::uninitialized();
+	let scno = SyscallId::Call as seL4_Word;
+    asm!("swi $0"
+	: "={r0}" (src), "={r1}" (info),
+	  "={r2}" (msg0), "={r3}" (msg1),
+	  "={r4}" (msg2), "={r5}" (msg3),
+	  "={r1}"
+	: "i" (swinum!(SyscallId::Call)),
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 
-    seL4_SetMR(0, mr0);
-    seL4_SetMR(1, mr1);
+    seL4_SetMR(0, msg0);
+    seL4_SetMR(1, msg1);
+    seL4_SetMR(2, msg2);
+    seL4_SetMR(3, msg3);
 
+    opt_assign!(sender, src);
     info
 }
 
 #[inline(always)]
 pub unsafe fn seL4_CallWithMRs(mut dest: seL4_CPtr, msgInfo: seL4_MessageInfo,
                                mr0: *mut seL4_Word, mr1: *mut seL4_Word) -> seL4_MessageInfo {
-    let mut info: seL4_MessageInfo = ::core::mem::uninitialized();
-    let mut msg0: seL4_Word = 0;
-    let mut msg1: seL4_Word = 0;
-
-    if !mr0.is_null() {
-        if msgInfo.get_length() > 0 {
-            msg0 = *mr0;
-        }
-    }
-    if !mr1.is_null() {
-        if msgInfo.get_length() > 1 {
-            msg1 = *mr1;
-        }
-    }
-
-    asm!("pushl %ebp
-          movl %ecx, %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          movl %ebp, %ecx
-          popl %ebp"
-        : "=S" (info.words[0])
-        "=D" (msg0),
-          "=c" (msg1),
-          "=b" (dest) /* dummy, tells GCC that ebx is clobbered (check if still necessary) */
-        : "a" (SyscallId::Call as seL4_Word),
-        "b" (dest)
-          "S" (msgInfo.words[0]),
-          "D" (msg0),
-          "c" (msg1)
-          : "%edx", "memory"
+	let info = ::core::mem::uninitialized();
+	let msg0 = ::core::mem::uninitialized();
+	let msg1 = ::core::mem::uninitialized();
+	let msg2 = ::core::mem::uninitialized();
+	let msg3 = ::core::mem::uninitialized();
+	let scno = SyscallId::Call as seL4_Word;
+    asm!("swi $0"
+	: "={r0}" (src), "={r1}" (info),
+	  "={r2}" (msg0), "={r3}" (msg1),
+	  "={r4}" (msg2), "={r5}" (msg3),
+	  "={r1}"
+	: "i" (swinum!(SyscallId::Call)),
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 
+    seL4_SetMR(0, msg0);
+    seL4_SetMR(1, msg1);
+    seL4_SetMR(2, msg2);
+    seL4_SetMR(3, msg3);
+
+    opt_assign!(sender, src);
     opt_assign!(mr0, msg0);
     opt_assign!(mr1, msg1);
-
+    opt_assign!(mr2, msg2);
+    opt_assign!(mr3, msg3);
     info
 }
 
 #[inline(always)]
 pub unsafe fn seL4_ReplyWait(dest: seL4_CPtr, msgInfo: seL4_MessageInfo,
                              sender: *mut seL4_Word) -> seL4_MessageInfo {
-    let mut info: seL4_MessageInfo = ::core::mem::uninitialized();
-    let badge: seL4_Word;
-    let mut mr0 = seL4_GetMR(0);
-    let mut mr1 = seL4_GetMR(1);
-
-    asm!("pushl %ebp
-          movl %ecx, %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          movl %ebp, %ecx
-          popl %ebp"
-        : "=b" (badge),
-        "=S" (info.words[0]),
-          "=D" (mr0),
-          "=c" (mr1)
-        : "a" (SyscallId::ReplyWait as seL4_Word),
-        "b" (dest),
-          "S" (msgInfo.words[0]),
-          "D" (mr0),
-          "c" (mr1)
-          : "%edx", "memory"
+	let info = ::core::mem::uninitialized();
+	let msg0 = seL4_GetMr(0);
+	let msg1 = seL4_GetMr(1);
+	let msg2 = seL4_GetMr(2);
+	let msg3 = seL4_GetMr(3);
+	let scno = SyscallId::ReplyWait as seL4_Word;
+    asm!("swi $0"
+	: "={r0}" (src), "={r1}" (info),
+	  "={r2}" (msg0), "={r3}" (msg1),
+	  "={r4}" (msg2), "={r5}" (msg3),
+	  "={r1}"
+	: "i" (swinum!(SyscallId::Call)),
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 
-    seL4_SetMR(0, mr0);
-    seL4_SetMR(1, mr1);
+    seL4_SetMR(0, msg0);
+    seL4_SetMR(1, msg1);
+    seL4_SetMR(2, msg2);
+    seL4_SetMR(3, msg3);
 
-    opt_assign!(sender, badge);
-
+    opt_assign!(sender, src);
     info
 }
 
 #[inline(always)]
 pub unsafe fn seL4_ReplayWaitWithMRs(dest: seL4_CPtr, msgInfo: seL4_MessageInfo, sender: *mut seL4_Word,
                                      mr0: *mut seL4_Word, mr1: *mut seL4_Word) -> seL4_MessageInfo {
-    let mut info: seL4_MessageInfo = ::core::mem::uninitialized();
-    let badge: seL4_Word;
-    let mut msg0: seL4_Word = 0;
-    let mut msg1: seL4_Word = 0;
-
-    if !mr0.is_null() {
-        if msgInfo.get_length() > 0 {
-            msg0 = *mr0;
-        }
-    }
-    if !mr1.is_null() {
-        if msgInfo.get_length() > 1 {
-            msg1 = *mr1;
-        }
-    }
-
-    asm!("pushl %ebp
-          movl %ecx, %ebp
-          movl %esp, %ecx
-          leal 1f, %edx
-          1:
-          sysenter
-          movl %ebp, %ecx
-          popl %ebp"
-        : "=b" (badge),
-        "=S" (info.words[0]),
-          "=D" (msg0),
-          "=c" (msg1)
-        : "b" (dest),
-        "S" (msgInfo.words[0]),
-          "D" (msg0),
-          "c" (msg1)
-        : "%edx", "memory"
+	let info = ::core::mem::uninitialized();
+	let msg0 = ::core::mem::uninitialized();
+	let msg1 = ::core::mem::uninitialized();
+	let msg2 = ::core::mem::uninitialized();
+	let msg3 = ::core::mem::uninitialized();
+	if !mr0.is_null() && msgInfo.get_length() > 0 {
+		msg0 = *mr0;
+	}
+	if !mr1.is_null() && msgInfo.get_length() > 1 {
+		msg1 = *mr1;
+	}
+	if !mr2.is_null() && msgInfo.get_length() > 2 {
+		msg2 = *mr2;
+	}
+	if !mr3.is_null() && msgInfo.get_length() > 3 {
+		msg3 = *mr3;
+	}
+	let scno = SyscallId::ReplyWait as seL4_Word;
+    asm!("swi $0"
+	: "={r0}" (src), "={r1}" (info),
+	  "={r2}" (msg0), "={r3}" (msg1),
+	  "={r4}" (msg2), "={r5}" (msg3),
+	  "={r1}"
+	: "i" (swinum!(SyscallId::Call)),
+	  "{r7}" (scno)
+	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
         : "volatile");
 
     opt_assign!(mr0, msg0);
     opt_assign!(mr1, msg1);
-    opt_assign!(sender, badge);
+    opt_assign!(mr2, msg2);
+    opt_assign!(mr3, msg3);
 
+    opt_assign!(sender, src);
     info
 }
 
