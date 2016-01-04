@@ -1,0 +1,4 @@
+jobs:
+    - script: "cargo build --target i686-sel4-unknown"
+      runner: "cmr"
+      name: "Build crate"
