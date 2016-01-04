@@ -1,3 +1,5 @@
+before_script:
+  - git submodule update --init --depth 1
 build:
   script: "cargo build --target i686-sel4-unknown"
   tags:
