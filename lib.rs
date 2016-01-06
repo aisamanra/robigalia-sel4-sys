@@ -26,6 +26,7 @@ extern crate rlibc;
 pub use seL4_Error::*;
 pub use seL4_FaultType::*;
 pub use seL4_LookupFailureType::*;
+pub use seL4_ObjectType::*;
 
 // XXX: These can't be repr(C), but it needs to "match an int" according to the comments on
 // SEL4_FORCE_LONG_ENUM. There's no single type that matches in Rust, so it needs to be
