@@ -535,7 +535,7 @@ class TaggedUnion:
                 mask = ((1 << size) - 1) << (offset % self.base)
 
                 subs = {\
-                    "block": ref.name, \
+                    "block": self.name, \
                     "field": field, \
                     "type": TYPES[ref.base], \
                     "assert": ASSERTS, \
@@ -552,6 +552,11 @@ class TaggedUnion:
                     "high_bits": high_bits,
                     "sign_extend": self.base_sign_extend and high,
                     "extend_bit": self.base_bits - 1}
+
+                emit_named("%s_%s_get_%s" % (self.name, ref.name, field),
+                    params, reader_template % subs)
+                emit_named("%s_%s_set_%s" % (self.name, ref.name, field),
+                    params, writer_template % subs)
 
     def make_names(self):
         "Return the set of candidate function names for a union"
