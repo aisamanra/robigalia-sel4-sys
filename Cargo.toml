@@ -6,7 +6,7 @@
 # except according to those terms.
 [package]
 name = "sel4-sys"
-version = "0.0.16"
+version = "0.0.17"
 authors = ["Corey Richardson <corey@octayn.net>"]
 description = "Rust interface to the seL4 kernel"
 documentation = "https://doc.robigalia.org/sel4_sys"
@@ -17,7 +17,6 @@ build = "build.rs"
 
 [features]
 unstable = []
-SEL4_DEBUG = []
 SEL4_DANGEROUS_CODE_INJECTION = []
 SEL4_CONFIG_BENCHMARK = []
 

@@ -568,7 +568,6 @@ pub unsafe fn seL4_Yield() {
 }
 
 #[inline(always)]
-#[cfg(feature = "SEL4_DEBUG")]
 pub unsafe fn seL4_DebugPutChar(c: u8) {
     asm!("pushl %ebp
           movl %esp, %ecx
@@ -584,7 +583,6 @@ pub unsafe fn seL4_DebugPutChar(c: u8) {
 }
 
 #[inline(always)]
-#[cfg(feature = "SEL4_DEBUG")]
 pub unsafe fn seL4_DebugHalt() {
     asm!("pushl %ebp
           movl %esp, %ecx
@@ -599,7 +597,6 @@ pub unsafe fn seL4_DebugHalt() {
 }
 
 #[inline(always)]
-#[cfg(feature = "SEL4_DEBUG")]
 pub unsafe fn seL4_DebugSnapshot() {
     asm!("pushl %ebp
           movl %esp, %ecx
@@ -614,7 +611,6 @@ pub unsafe fn seL4_DebugSnapshot() {
 }
 
 #[inline(always)]
-#[cfg(feature = "SEL4_DEBUG")]
 pub unsafe fn seL4_DebugCapIdentify(cap: seL4_CPtr) -> u32 {
     let mut _cap = cap;
     asm!("pushl %ebp
@@ -633,7 +629,6 @@ pub unsafe fn seL4_DebugCapIdentify(cap: seL4_CPtr) -> u32 {
 
 // Note: name MUST be NUL-terminated.
 #[inline(always)]
-#[cfg(feature = "SEL4_DEBUG")]
 pub unsafe fn seL4_DebugNameThread(tcb: seL4_CPtr, name: &[u8]) {
     core::ptr::copy_nonoverlapping( name.as_ptr() as *mut u8, (&mut (*seL4_GetIPCBuffer()).msg).as_mut_ptr() as *mut u8,name.len());
     asm!("pushl %ebp
