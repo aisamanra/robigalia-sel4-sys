@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+from __future__ import division, print_function
+
 #
 # Copyright 2015, Corey Richardson
 # Copyright 2014, NICTA
@@ -72,9 +74,9 @@ def t_comment(t):
 t_ignore = ' \t'
 
 def t_error(t):
-    print >>sys.stderr, "%s: Unexpected character '%s'" % (sys.argv[0], t.value[0])
+    print("%s: Unexpected character '%s'" % (sys.argv[0], t.value[0]), file=sys.stderr)
     if DEBUG:
-        print >>sys.stderr, 'Token: %s' % str(t)
+        print('Token: %s' % str(t), file=sys.stderr)
     sys.exit(1)
 
 def p_start(t):
@@ -175,7 +177,7 @@ def p_masks(t):
     t[0] = t[1] + [(t[3],t[4])]
 
 def p_error(t):
-    print >>sys.stderr, "Syntax error at token '%s'" % t.value
+    print("Syntax error at token '%s'" % t.value, file=sys.stderr)
     sys.exit(1)
 
 ### Templates
@@ -289,8 +291,8 @@ def emit_named(name, params, string):
     # params.names
 
      if(name in params.names):
-        print >>params.output, string
-        print >>params.output
+        print(string, file=params.output)
+        print(file=params.output)
 
 class TaggedUnion:
     def __init__(self, name, tagname, classes, tags):
@@ -354,7 +356,7 @@ class TaggedUnion:
 
     def set_base(self, base, base_bits, base_sign_extend, suffix):
         self.base = base
-        self.multiple = self.union_size / base
+        self.multiple = self.union_size // base
         self.constant_suffix = suffix
         self.base_bits = base_bits
         self.base_sign_extend = base_sign_extend
@@ -364,33 +366,33 @@ class TaggedUnion:
             tag_offset = self.tag_offset[w]
 
             if tag_index is None:
-                tag_index = tag_offset / base
+                tag_index = tag_offset // base
 
-            if (tag_offset / base) != tag_index:
+            if (tag_offset // base) != tag_index:
                 raise ValueError(
                     "The tag field of tagged union %s"
                     " is in a different word (%s) to the others (%s)."
-                    % (self.name, hex(tag_offset / base), hex(tag_index)))
+                    % (self.name, hex(tag_offset // base), hex(tag_index)))
 
     def generate(self, params):
         output = params.output
 
         # Generate type
-        print >>output, type_template % \
+        print(type_template % \
                         {"type": TYPES[self.base], \
                          "name": self.name, \
-                         "multiple": self.multiple}
-        print >>output
+                         "multiple": self.multiple}, file=output)
+        print(file=output)
 
         # Generate tag enum
-        print >>output, "#[repr(C)] pub enum %sTag {" % self.name
+        print("#[repr(C)] pub enum %sTag {" % self.name, file=output)
         if len(self.tags) > 0:
             for name, value, ref in self.tags[:-1]:
-                print >>output, "    %s_%s = %d," % (self.name, name, value)
+                print("    %s_%s = %d," % (self.name, name, value), file=output)
             name, value, ref = self.tags[-1];
-            print >>output, "    %s_%s = %d" % (self.name, name, value)
-        print >>output, "}"
-        print >>output
+            print(output, "    %s_%s = %d" % (self.name, name, value), file=output)
+        print("}", file=output)
+        print(file=output)
 
         subs = {\
             'union': self.name, \
@@ -407,7 +409,7 @@ class TaggedUnion:
                          dict(subs,
                               mask=2 ** width - 1,
                               classmask=self.word_classmask(width),
-                              index=self.tag_offset[width] / self.base,
+                              index=self.tag_offset[width] // self.base,
                               shift=self.tag_offset[width] % self.base)
                        for template, width in zip(templates, self.widths)])
             + tag_reader_footer_template % subs)
@@ -424,7 +426,7 @@ class TaggedUnion:
                          dict(subs,
                               mask=2 ** width - 1,
                               classmask=self.word_classmask(width),
-                              index=self.tag_offset[width] / self.base,
+                              index=self.tag_offset[width] // self.base,
                               shift=self.tag_offset[width] % self.base)
                        for template, width in zip(templates, self.widths)])
             + tag_eq_reader_footer_template % subs)
@@ -461,7 +463,7 @@ class TaggedUnion:
                 else:
                     f_value = field
 
-                index = offset / self.base
+                index = offset // self.base
                 if high:
                     shift_op = ">>"
                     shift = self.base_bits - size - (offset % self.base)
@@ -514,7 +516,7 @@ class TaggedUnion:
                 # Don't duplicate tag accessors
                 if field == self.tagname: continue
 
-                index = offset / self.base
+                index = offset // self.base
                 if high:
                     write_shift = ">>"
                     read_shift = "<<"
@@ -544,7 +546,7 @@ class TaggedUnion:
                     "r_shift_op": read_shift, \
                     "w_shift_op": write_shift, \
                     "mask": mask, \
-                    "tagindex": tagnameoffset / self.base, \
+                    "tagindex": tagnameoffset // self.base, \
                     "tagshift": tagnameoffset % self.base, \
                     "tagmask": tagmask, \
                     "union": self.name, \
@@ -750,10 +752,11 @@ class TaggedUnion:
             pre_mask = classes[w]
 
         if params.showclasses:
-            print >> sys.stderr, "-----%s.%s" % (self.name, self.tagname)
+            print("-----%s.%s" % (self.name, self.tagname), file=sys.stderr)
             for w in widths:
-                print >> sys.stderr, "{:2d} = {:s}".format(
-                                        w, self.represent_class(w))
+                print("{:2d} = {:s}".format(
+                                        w, self.represent_class(w)),
+                                        file=sys.stderr)
 
         self.widths = widths
 
@@ -804,9 +807,9 @@ class Block:
         if self.size % base != 0:
             raise ValueError("Size of block %s not a multiple of base" \
                              % self.name)
-        self.multiple = self.size / base
+        self.multiple = self.size // base
         for name, offset, size, high in self.fields:
-            if offset / base != (offset+size-1) / base:
+            if offset // base != (offset+size-1) // base:
                 raise ValueError("Field %s of block %s " \
                                  "crosses a word boundary" \
                                  % (name, self.name))
@@ -818,11 +821,11 @@ class Block:
         if self.tagged: return
 
         # Type definition
-        print >>output, type_template % \
+        print(type_template % \
                         {"type": TYPES[self.base], \
                          "name": self.name, \
-                         "multiple": self.multiple}
-        print >>output
+                         "multiple": self.multiple}, file=output)
+        print(file=output)
 
         # Generator
         arg_list = ["%s: %s" % (field, TYPES[self.base]) for \
@@ -844,7 +847,7 @@ class Block:
         field_inits = []
         ptr_field_inits = []
         for field, offset, size, high in self.fields:
-            index = offset / self.base
+            index = offset // self.base
             if high:
                 shift_op = ">>"
                 shift = self.base_bits - size - (offset % self.base)
@@ -907,7 +910,7 @@ class Block:
 
         # Accessors
         for field, offset, size, high in self.fields:
-            index = offset / self.base
+            index = offset // self.base
             if high:
                 write_shift = ">>"
                 read_shift = "<<"

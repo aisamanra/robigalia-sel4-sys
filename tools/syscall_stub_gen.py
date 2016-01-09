@@ -10,6 +10,8 @@
 # @TAG(NICTA_BSD)
 #
 
+from __future__ import division, print_function
+
 #
 # seL4 System Call Stub Generator
 # ===============================
@@ -199,7 +201,7 @@ class StructType(Type):
         Type.__init__(self, name, size_bits)
 
     def c_expression(self, var_name, word_num, member_name):
-        assert word_num < self.size_bits / WORD_SIZE_BITS
+        assert word_num < self.size_bits // WORD_SIZE_BITS
 
         # Multiword structure.
         assert self.pass_by_reference()
@@ -353,7 +355,7 @@ def generate_marshal_expressions(params, num_mrs, structs):
         be bitwise-or'ed into it.
         """
 
-        target_word = first_bit / WORD_SIZE_BITS
+        target_word = first_bit // WORD_SIZE_BITS
         target_offset = first_bit % WORD_SIZE_BITS
 
         # double word type
@@ -380,7 +382,7 @@ def generate_marshal_expressions(params, num_mrs, structs):
 
         # Multiword array
         assert target_offset == 0
-        num_words = num_bits / WORD_SIZE_BITS
+        num_words = num_bits // WORD_SIZE_BITS
         for i in range(num_words):
             expr = param.type.c_expression(param.name, i, struct_members(param.type, structs));
             word_array[target_word + i].append(expr)
@@ -412,13 +414,13 @@ def generate_unmarshal_expressions(params):
         """
         Unmarshal a single parameter.
         """
-        first_word = first_bit / WORD_SIZE_BITS
+        first_word = first_bit // WORD_SIZE_BITS
         bit_offset = first_bit % WORD_SIZE_BITS
 
         # Multiword type?
         if num_bits > WORD_SIZE_BITS:
             result = []
-            for x in range(num_bits / WORD_SIZE_BITS):
+            for x in range(num_bits // WORD_SIZE_BITS):
                 result.append("%%(w%d)s" % (x + first_word))
             return result
 
@@ -532,7 +534,7 @@ def generate_stub(arch, interface_name, method_name, method_id, input_params, ou
     # Compute how many words the inputs and output will require.
     #
     input_param_words = len(input_expressions)
-    output_param_words = sum([p.type.size_bits for p in output_params]) / WORD_SIZE_BITS
+    output_param_words = sum([p.type.size_bits for p in output_params]) // WORD_SIZE_BITS
 
     #
     # Setup variables we will need.
