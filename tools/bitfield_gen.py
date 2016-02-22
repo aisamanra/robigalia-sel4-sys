@@ -390,7 +390,7 @@ class TaggedUnion:
             for name, value, ref in self.tags[:-1]:
                 print("    %s_%s = %d," % (self.name, name, value), file=output)
             name, value, ref = self.tags[-1];
-            print(output, "    %s_%s = %d" % (self.name, name, value), file=output)
+            print("    %s_%s = %d" % (self.name, name, value), file=output)
         print("}", file=output)
         print(file=output)
 
