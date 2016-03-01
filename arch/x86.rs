@@ -12,6 +12,16 @@
 pub type seL4_Word = u32;
 pub type seL4_CPtr = seL4_Word;
 
+pub const seL4_WordBits: usize = 32;
+pub const seL4_PageBits: usize = 12;
+pub const seL4_SlotBits: usize = 4;
+pub const seL4_TCBBits: usize = 10;
+pub const seL4_EndpointBits: usize = 4;
+pub const seL4_PageTableBits: usize = 12;
+pub const seL4_PageDirBits: usize = 12;
+pub const seL4_IOPageTableBits: usize = 12;
+pub const seL4_ASIDPoolBits: usize = 12;
+
 pub type seL4_IA32_ASIDControl = seL4_CPtr;
 pub type seL4_IA32_ASIDPool = seL4_CPtr;
 pub type seL4_IA32_IOSpace = seL4_CPtr;
