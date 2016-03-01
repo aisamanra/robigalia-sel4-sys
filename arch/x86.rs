@@ -640,7 +640,7 @@ pub unsafe fn seL4_DebugCapIdentify(cap: seL4_CPtr) -> u32 {
 // Note: name MUST be NUL-terminated.
 #[inline(always)]
 pub unsafe fn seL4_DebugNameThread(tcb: seL4_CPtr, name: &[u8]) {
-    core::ptr::copy_nonoverlapping( name.as_ptr() as *mut u8, (&mut (*seL4_GetIPCBuffer()).msg).as_mut_ptr() as *mut u8,name.len());
+    core::ptr::copy_nonoverlapping(name.as_ptr() as *mut u8, (&mut (*seL4_GetIPCBuffer()).msg).as_mut_ptr() as *mut u8,name.len());
     asm!("pushl %ebp
           movl %esp, %ecx
           leal 1f, %edx

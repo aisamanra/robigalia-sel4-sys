@@ -1,5 +1,5 @@
 /*
- * Copyright 2015, Killian Coddington 
+ * Copyright 2015, Killian Coddington
  * Copyright 2014, NICTA
  *
  * This software may be distributed and modified according to the terms of
@@ -99,7 +99,7 @@ pub unsafe fn seL4_SetTag(tag: seL4_MessageInfo) {
 
 #[inline(always)]
 pub unsafe fn seL4_GetMR(regnum: usize) -> seL4_Word {
-	(*seL4_GetIPCBuffer()).msg[regnum]	
+	(*seL4_GetIPCBuffer()).msg[regnum]
 }
 
 #[inline(always)]
@@ -109,12 +109,12 @@ pub unsafe fn seL4_SetMR(regnum: usize, value: seL4_Word) {
 
 #[inline(always)]
 pub unsafe fn seL4_GetUserData() -> seL4_Word {
-	(*seL4_GetIPCBuffer()).userData	
+	(*seL4_GetIPCBuffer()).userData
 }
 
 #[inline(always)]
 pub unsafe fn seL4_SetUserData(data: seL4_Word) {
-	(*seL4_GetIPCBuffer()).userData = data;	
+	(*seL4_GetIPCBuffer()).userData = data;
 }
 
 #[inline(always)]
@@ -178,7 +178,7 @@ pub unsafe fn seL4_Send(dest: seL4_CPtr, msgInfo: seL4_MessageInfo) {
     asm!("swi $0"
 	:
 	: "i" (swinum!(SyscallId::Send)),
-	  "{r0}" (dest), 
+	  "{r0}" (dest),
 	  "{r1}" (msgInfo.words[0]),
 	  "{r2}" (msg0), "{r3}" (msg1),
 	  "{r4}" (msg2), "{r5}" (msg3),
@@ -231,7 +231,7 @@ pub unsafe fn seL4_SendWithMRs(dest: seL4_CPtr, msgInfo: seL4_MessageInfo,
     asm!("swi $0"
 	:
 	: "i" (swinum!(SyscallId::Send)),
-	  "{r0}" (dest), 
+	  "{r0}" (dest),
 	  "{r1}" (msgInfo.words[0]),
 	  "{r2}" (msg0), "{r3}" (msg1),
 	  "{r4}" (msg2), "{r5}" (msg3),
@@ -250,7 +250,7 @@ pub unsafe fn seL4_NBSend(dest: seL4_CPtr, msgInfo: seL4_MessageInfo) {
     asm!("swi $0"
 	:
 	: "i" (swinum!(SyscallId::NBSend)),
-	  "{r0}" (dest), 
+	  "{r0}" (dest),
 	  "{r1}" (msgInfo.words[0]),
 	  "{r2}" (msg0), "{r3}" (msg1),
 	  "{r4}" (msg2), "{r5}" (msg3),
@@ -284,7 +284,7 @@ pub unsafe fn seL4_NBSendWithMRs(dest: seL4_CPtr, msgInfo: seL4_MessageInfo,
     asm!("swi $0"
 	:
 	: "i" (swinum!(SyscallId::NBSend)),
-	  "{r0}" (dest), 
+	  "{r0}" (dest),
 	  "{r1}" (msgInfo.words[0]),
 	  "{r2}" (msg0), "{r3}" (msg1),
 	  "{r4}" (msg2), "{r5}" (msg3),
@@ -368,7 +368,7 @@ pub unsafe fn seL4_Recv(mut src: seL4_CPtr, sender: *mut seL4_Word) -> seL4_Mess
 	let mut msg3 = ::core::mem::uninitialized();
 	let scno = SyscallId::Recv as seL4_Word;
     asm!("swi $6"
-	: "={r0}" (src), 
+	: "={r0}" (src),
 	  "={r1}" (info.words[0]),
 	  "={r2}" (msg0), "={r3}" (msg1),
 	  "={r4}" (msg2), "={r5}" (msg3)
@@ -471,7 +471,7 @@ pub unsafe fn seL4_CallWithMRs(dest: seL4_CPtr, mut msgInfo: seL4_MessageInfo,
 	  "={r2}" (msg0), "={r3}" (msg1),
 	  "={r4}" (msg2), "={r5}" (msg3)
 	: "i" (swinum!(SyscallId::Call)),
-	  "{r7}" (scno),  
+	  "{r7}" (scno),
       "{r0}" (dest),
       "{r1}" (msgInfo.words[0])
 	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
@@ -500,7 +500,7 @@ pub unsafe fn seL4_ReplyRecv(mut src: seL4_CPtr, mut msgInfo: seL4_MessageInfo,
 	  "={r4}" (msg2), "={r5}" (msg3)
 	: "i" (swinum!(SyscallId::ReplyRecv)),
 	  "{r7}" (scno),
-      "{r0}" (src), 
+      "{r0}" (src),
       "{r1}" (msgInfo.words[0])
 	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
     : "volatile");
@@ -515,7 +515,7 @@ pub unsafe fn seL4_ReplyRecv(mut src: seL4_CPtr, mut msgInfo: seL4_MessageInfo,
 }
 
 #[inline(always)]
-pub unsafe fn seL4_ReplyRecvWithMRs(mut src: seL4_CPtr, mut msgInfo: seL4_MessageInfo, 
+pub unsafe fn seL4_ReplyRecvWithMRs(mut src: seL4_CPtr, mut msgInfo: seL4_MessageInfo,
                                     sender: *mut seL4_Word,
                                     mr0: *mut seL4_Word, mr1: *mut seL4_Word,
                                     mr2: *mut seL4_Word, mr3: *mut seL4_Word,
@@ -543,7 +543,7 @@ pub unsafe fn seL4_ReplyRecvWithMRs(mut src: seL4_CPtr, mut msgInfo: seL4_Messag
 	  "={r4}" (msg2), "={r5}" (msg3)
 	: "i" (swinum!(SyscallId::ReplyRecv)),
 	  "{r7}" (scno),
-      "{r0}" (src), 
+      "{r0}" (src),
       "{r1}" (msgInfo.words[0])
 	: "memory", "r0", "r1", "r2", "r3", "r4", "r5", "r7"
     : "volatile");
