@@ -84,22 +84,22 @@ macro_rules! error_types {
 
 
 #[cfg(all(target_arch = "x86", target_pointer_width = "32"))]
-include!("arch/x86.rs");
+include!("arch/ia32.rs");
 
 #[cfg(all(target_arch = "arm", target_pointer_width = "32"))]
 include!("arch/arm.rs");
 
 #[cfg(all(target_arch = "x86", target_pointer_width = "32"))]
-include!(concat!(env!("OUT_DIR"), "/x86_invocation.rs"));
+include!(concat!(env!("OUT_DIR"), "/ia32_invocation.rs"));
 
 #[cfg(all(target_arch = "arm", target_pointer_width = "32"))]
-include!(concat!(env!("OUT_DIR"), "/arm_invocation.rs"));
+include!(concat!(env!("OUT_DIR"), "/aarch32_invocation.rs"));
 
 #[cfg(all(target_arch = "x86", target_pointer_width = "32"))]
-include!(concat!(env!("OUT_DIR"), "/x86_syscall_stub.rs"));
+include!(concat!(env!("OUT_DIR"), "/ia32_syscall_stub.rs"));
 
 #[cfg(all(target_arch = "arm", target_pointer_width = "32"))]
-include!(concat!(env!("OUT_DIR"), "/arm_syscall_stub.rs"));
+include!(concat!(env!("OUT_DIR"), "/aarch32_syscall_stub.rs"));
 
 include!(concat!(env!("OUT_DIR"), "/types.rs"));
 include!(concat!(env!("OUT_DIR"), "/syscalls.rs"));
@@ -118,13 +118,28 @@ pub const seL4_MsgMaxExtraCaps: usize = (1usize << seL4_MsgExtraCapBits) - 1;
 
 #[repr(C)]
 #[derive(Copy)]
+/// Buffer used to store received IPC messages
 pub struct seL4_IPCBuffer {
+    /// Message tag
+    ///
+    /// The kernel does not initialize this.
     pub tag: seL4_MessageInfo,
+    /// Message contents
+    ///
+    /// The kernel only initializes the bytes which were not able to fit into physical registers.
     pub msg: [seL4_Word; seL4_MsgMaxLength],
+    /// Arbitrary user data.
+    ///
+    /// The seL4 C libraries expect this to be a pointer to the IPC buffer in the thread's VSpace.,
+    /// but this doesn't really matter.
     pub userData: seL4_Word,
+    /// Capabilities to transfer (if sending) or unwrapped badges
     pub caps_or_badges: [seL4_Word; seL4_MsgMaxExtraCaps],
+    /// CPtr to a CNode in the thread's CSpace from which to find the receive slot
     pub receiveCNode: seL4_CPtr,
+    /// CPtr to the receive slot, relative to receiveCNode
     pub receiveIndex: seL4_CPtr,
+    /// Number of bits of receiveIndex to use
     pub receiveDepth: seL4_CPtr,
 }
 
@@ -151,46 +166,85 @@ pub static seL4_CapDomain: seL4_Word        = 11;  /* global domain controller c
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// A half-open [start..end) range of slots
 pub struct seL4_SlotRegion {
-    pub start: seL4_Word , /* first CNode slot position OF region */
+    /// First CNode slot position of the region
+    pub start: seL4_Word, 
+    /// First CNode slot position after the region
     pub end: seL4_Word,   /* first CNode slot position AFTER region */
 }
 
+// next release
+//
+//#[repr(C)]
+//#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+//pub struct seL4_UntypedDesc {
+//    /// Physical address corresponding of the untyped object's backing memory
+//    pub paddr: seL4_Word,
+//    pub padding1: u8,
+//    pub padding2: u8,
+//    /// log2 size of the region of memory backing the untyped object
+//    pub size_bits: u8,
+//    /// Whether the backing memory corresponds to some device memory
+//    pub is_device: u8,
+//}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Region of device memory
 pub struct seL4_DeviceRegion {
+    /// Base physical address of the device region
     pub basePaddr: seL4_Word,     /* base physical address of device region */
-    pub frameSizeBits: seL4_Word, /* size (2^n bytes) of a device-region frame */
-    pub frames: seL4_SlotRegion,        /* device-region frame caps */
+    /// log2 size of a device region frame
+    pub frameSizeBits: seL4_Word,
+    /// Frame caps for the pages in the device region
+    pub frames: seL4_SlotRegion,
 }
 
 /* XXX: These MUST match the kernel config at build-time. */
-pub const CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS: usize = 167;
+pub const CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS: usize = 166;
 pub const CONFIG_MAX_NUM_BOOTINFO_DEVICE_REGIONS: usize = 199;
 
 #[repr(C)]
 #[derive(Copy)]
-pub struct seL4_BootInfo {
-    pub nodeID: seL4_Word,          /* ID [0..numNodes-1] of the seL4 node (0 if uniprocessor) */
-    pub numNodes: seL4_Word,        /* number of seL4 nodes (1 if uniprocessor) */
-    pub numIOPTLevels: seL4_Word,   /* number of IOMMU PT levels (0 if no IOMMU support) */
-    pub ipcBuffer: *mut seL4_IPCBuffer,       /* pointer to initial thread's IPC buffer */
-    pub empty: seL4_SlotRegion,           /* empty slots (null caps) */
-    pub sharedFrames: seL4_SlotRegion,    /* shared-frame caps (shared between seL4 nodes) */
-    pub userImageFrames: seL4_SlotRegion, /* userland-image frame caps */
-    pub userImagePDs: seL4_SlotRegion,    /* userland-image PD caps */
-    pub userImagePTs: seL4_SlotRegion,    /* userland-image PT caps */
-    pub untyped: seL4_SlotRegion,         /* untyped-object caps (untyped caps) */
-    pub untypedPaddrList:   [seL4_Word; CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS], /* physical address of each untyped cap */
-    pub untypedSizeBitsList: [u8; CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS], /* size (2^n) bytes of each untyped cap */
-    pub initThreadCNodeSizeBits: u8, /* initial thread's root CNode size (2^n slots) */
-    pub numDeviceRegions: seL4_Word,        /* number of device regions */
-    pub deviceRegions: [seL4_DeviceRegion; CONFIG_MAX_NUM_BOOTINFO_DEVICE_REGIONS], /* device regions */
-    pub initThreadDomain: u32, /* Initial thread's domain ID */
+pub struct seL4_BootInfo {           
+    /// ID [0..numNodes-1] of the current node (0 if uniprocessor)
+    pub nodeID: seL4_Word,          
+    /// Number of seL4 nodes (1 if uniprocessor)
+    pub numNodes: seL4_Word,
+    /// Number of IOMMU PT levels (0 if no IOMMU support)
+    pub numIOPTLevels: seL4_Word,   
+    /// pointer to root task's IPC buffer */
+    pub ipcBuffer: *mut seL4_IPCBuffer,      
+    /// Empty slots (null caps)
+    pub empty: seL4_SlotRegion,
+    /// Frames shared between nodes
+    pub sharedFrames: seL4_SlotRegion,
+    /// Frame caps used for the loaded ELF image of the root task
+    pub userImageFrames: seL4_SlotRegion,
+    /// PD caps used for the loaded ELF image of the root task
+    pub userImagePaging: seL4_SlotRegion,
+    /// Untyped object caps
+    pub untyped: seL4_SlotRegion,
+    /// IOSpace caps for ARM SMMU
+    pub ioSpaceCaps: seL4_SlotRegion,
+    /// Physical addresses of caps in untyped
+    pub untypedPaddrList:   [seL4_Word; CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS],
+    /// log2 size of caps in untyped
+    pub untypedSizeBitsList: [u8; CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS],
+    /// log2 size of root task's CNode
+    pub initThreadCNodeSizeBits: u8,
+    /// Number of populated device regions
+    pub numDeviceRegions: seL4_Word,
+    /// Untyped caps corresponding to devices the kernel found
+    pub deviceRegions: [seL4_DeviceRegion; CONFIG_MAX_NUM_BOOTINFO_DEVICE_REGIONS],
+    /// Root task's domain ID
+    pub initThreadDomain: u32,
 }
 
 impl ::core::clone::Clone for seL4_BootInfo {
     fn clone(&self) -> Self {
+        // yay [T; n]
         *self
     }
 }
