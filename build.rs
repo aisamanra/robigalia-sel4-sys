@@ -8,7 +8,7 @@
  * according to those terms.
  */
 
-use std::fs::File;
+use std::fs::{OpenOptions, File};
 use std::process::{Command, Stdio};
 use std::os::unix::prelude::*;
 use std::env;
@@ -33,42 +33,47 @@ fn main() {
     }
 
     for &(arch, archdir, word_size) in &arches {
-        assert!(Command::new("/usr/bin/env")
-            .arg("python")
-            .args(&["tools/invocation_header_gen.py",
-                  "--dest", &*format!("{}/{}_invocation.rs", out_dir, arch),
-                  "seL4/libsel4/include/interfaces/sel4.xml",
-                  &*format!("seL4/libsel4/arch_include/{}/interfaces/sel4arch.xml", archdir),
-            ])
-            .status().unwrap().success());
+        let mut cmd = Command::new("/usr/bin/env");
+        cmd.arg("python")
+           .args(&["tools/invocation_header_gen.py",
+                 "--dest", &*format!("{}/{}_invocation.rs", out_dir, arch),
+                 "seL4/libsel4/include/interfaces/sel4.xml",
+                 &*format!("seL4/libsel4/arch_include/{}/interfaces/sel4arch.xml", archdir),
+                 &*format!("seL4/libsel4/sel4_arch_include/{}/interfaces/sel4arch.xml", arch),
+            ]);
+        println!("Running {:?}", cmd);
+        assert!(cmd.status().unwrap().success());
     }
 
-    assert!(Command::new("/usr/bin/env")
-        .arg("python")
-        .args(&["tools/syscall_header_gen.py",
-              "--xml", "seL4/include/api/syscall.xml",
-              "--dest", &*format!("{}/syscalls.rs", out_dir)])
-        .status().unwrap().success());
+    let mut cmd = Command::new("/usr/bin/env");
+    cmd.arg("python")
+       .args(&["tools/syscall_header_gen.py",
+             "--xml", "seL4/include/api/syscall.xml",
+             "--dest", &*format!("{}/syscalls.rs", out_dir)]);
+    println!("Running {:?}", cmd);
+    assert!(cmd.status().unwrap().success());
 
     let bfin = File::open("seL4/libsel4/include/sel4/types_32.bf").unwrap();
     let bfout = File::create(&*format!("{}/types.rs", out_dir)).unwrap();
-    assert!(Command::new("/usr/bin/env")
-        .arg("python")
-        .arg("tools/bitfield_gen.py")
-        .stdin(unsafe { Stdio::from_raw_fd(bfin.as_raw_fd()) })
-        .stdout(unsafe { Stdio::from_raw_fd(bfout.as_raw_fd()) })
-        .status().unwrap().success());
+    let mut cmd = Command::new("/usr/bin/env");
+    cmd.arg("python")
+       .arg("tools/bitfield_gen.py")
+       .stdin(unsafe { Stdio::from_raw_fd(bfin.as_raw_fd()) })
+       .stdout(unsafe { Stdio::from_raw_fd(bfout.as_raw_fd()) });
+    println!("Running {:?}", cmd);
+    assert!(cmd.status().unwrap().success());
     std::mem::forget(bfin);
     std::mem::forget(bfout);
 
-    let bfin = OpenOptions::new().append(true).open("seL4/libsel4/include/sel4/types.bf").unwrap();
-    let bfout = File::create(&*format!("{}/types.rs", out_dir)).unwrap();
-    assert!(Command::new("/usr/bin/env")
-        .arg("python")
-        .arg("tools/bitfield_gen.py")
-        .stdin(unsafe { Stdio::from_raw_fd(bfin.as_raw_fd()) })
-        .stdout(unsafe { Stdio::from_raw_fd(bfout.as_raw_fd()) })
-        .status().unwrap().success());
+    let bfin = File::open("seL4/libsel4/include/sel4/shared_types_32.bf").unwrap();
+    let bfout = OpenOptions::new().append(true).open(&*format!("{}/types.rs", out_dir)).unwrap();
+    let mut cmd = Command::new("/usr/bin/env");
+    cmd.arg("python")
+       .arg("tools/bitfield_gen.py")
+       .stdin(unsafe { Stdio::from_raw_fd(bfin.as_raw_fd()) })
+       .stdout(unsafe { Stdio::from_raw_fd(bfout.as_raw_fd()) });
+    println!("Running {:?}", cmd);
+    assert!(cmd.status().unwrap().success());
     std::mem::forget(bfin);
     std::mem::forget(bfout);
 }

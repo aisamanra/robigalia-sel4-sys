@@ -65,8 +65,8 @@ MESSAGE_REGISTERS_FOR_ARCH = {
 }
 
 WORD_CONST_SUFFIX_BITS = {
-    32: "u32",
-    64: "u64",
+    32: "",
+    64: "",
 }
 
 # Maximum number of words that will be in a message.

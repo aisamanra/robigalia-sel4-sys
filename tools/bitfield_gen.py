@@ -357,7 +357,7 @@ class TaggedUnion:
     def set_base(self, base, base_bits, base_sign_extend, suffix):
         self.base = base
         self.multiple = self.union_size // base
-        self.constant_suffix = suffix
+        self.constant_suffix = '' # suffix
         self.base_bits = base_bits
         self.base_sign_extend = base_sign_extend
 
@@ -801,7 +801,7 @@ class Block:
 
     def set_base(self, base, base_bits, base_sign_extend, suffix):
         self.base = base
-        self.constant_suffix = suffix
+        self.constant_suffix = '' # suffix
         self.base_bits = base_bits
         self.base_sign_extend = base_sign_extend
         if self.size % base != 0:

@@ -22,14 +22,14 @@ pub const seL4_PageDirBits: usize = 12;
 pub const seL4_IOPageTableBits: usize = 12;
 pub const seL4_ASIDPoolBits: usize = 12;
 
-pub type seL4_IA32_ASIDControl = seL4_CPtr;
-pub type seL4_IA32_ASIDPool = seL4_CPtr;
-pub type seL4_IA32_IOSpace = seL4_CPtr;
-pub type seL4_IA32_IOPort = seL4_CPtr;
-pub type seL4_IA32_Page = seL4_CPtr;
-pub type seL4_IA32_PageDirectory = seL4_CPtr;
-pub type seL4_IA32_PageTable = seL4_CPtr;
-pub type seL4_IA32_IOPageTable = seL4_CPtr;
+pub type seL4_X86_ASIDControl = seL4_CPtr;
+pub type seL4_X86_ASIDPool = seL4_CPtr;
+pub type seL4_X86_IOSpace = seL4_CPtr;
+pub type seL4_X86_IOPort = seL4_CPtr;
+pub type seL4_X86_Page = seL4_CPtr;
+pub type seL4_X86_PageDirectory = seL4_CPtr;
+pub type seL4_X86_PageTable = seL4_CPtr;
+pub type seL4_X86_IOPageTable = seL4_CPtr;
 
 error_types!(u32);
 
@@ -43,17 +43,17 @@ pub enum seL4_ObjectType {
     seL4_EndpointObject,
     seL4_NotificationObject,
     seL4_CapTableObject,
-    seL4_IA32_4K,
-    seL4_IA32_LargePage,
-    seL4_IA32_PageTableObject,
-    seL4_IA32_PageDirectoryObject,
-    seL4_IA32_PDPTObject,
-    seL4_IA32_IOPageTableObject,
+    seL4_X86_4K,
+    seL4_X86_LargePage,
+    seL4_X86_PageTableObject,
+    seL4_X86_PageDirectoryObject,
+    seL4_X86_PDPTObject,
+    seL4_X86_IOPageTableObject,
 }
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum seL4_IA32_VMAttributes {
+pub enum seL4_X86_VMAttributes {
     WriteBack = 0,
     WriteThrough = 1,
     CacheDisabled = 2,

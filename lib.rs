@@ -84,7 +84,7 @@ macro_rules! error_types {
 
 
 #[cfg(all(target_arch = "x86", target_pointer_width = "32"))]
-include!("arch/ia32.rs");
+include!("arch/x86.rs");
 
 #[cfg(all(target_arch = "arm", target_pointer_width = "32"))]
 include!("arch/arm.rs");
