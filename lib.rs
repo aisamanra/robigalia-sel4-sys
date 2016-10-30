@@ -21,7 +21,7 @@ use architecture_not_supported_sorry;
 
 
 extern crate rlibc;
-#[macro_use] extern crate bitflags_core;
+#[macro_use] extern crate bitflags;
 
 pub use seL4_Error::*;
 pub use seL4_FaultType::*;
@@ -35,7 +35,7 @@ pub use seL4_ObjectType::*;
 macro_rules! error_types {
     ($int_width:ident) => {
         bitflags! {
-            flags seL4_CapRights: $int_width {
+            pub flags seL4_CapRights: $int_width {
                 const seL4_CanWrite = 0x1,
                 const seL4_CanRead = 0x2,
                 const seL4_CanGrant = 0x4
