@@ -6,7 +6,7 @@
 # except according to those terms.
 [package]
 name = "sel4-sys"
-version = "0.0.20"
+version = "0.0.21"
 authors = ["Corey Richardson <corey@octayn.net>"]
 description = "Rust interface to the seL4 kernel"
 documentation = "https://doc.robigalia.org/sel4_sys"
@@ -24,5 +24,5 @@ SEL4_CONFIG_BENCHMARK = []
 path = "lib.rs"
 
 [dependencies]
-rlibc = "0.1.4"
-bitflags-core = "0.3.4"
+rlibc = "1.0.0"
+bitflags = "0.7.0"
