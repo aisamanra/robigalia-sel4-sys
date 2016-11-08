@@ -8,6 +8,9 @@ A Rust interface to the [seL4 kernel](https://sel4.systems). Raw syscall
 bindings, kernel API, and data structure declarations.  Provides the same
 interface that libsel4 does, with a few C-isms reduced.
 
+NOTE: be sure to `git submodule update --recursive --init` if you clone this
+repository, as we pull in seL4 via a submodule.
+
 ## Status
 
 Complete, though largely untested.
