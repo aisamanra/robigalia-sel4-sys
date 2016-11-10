@@ -630,6 +630,7 @@ pub unsafe fn seL4_DebugNameThread(tcb: seL4_CPtr, name: &[u8]) {
 }
 
 #[inline(always)]
+#[cfg(feature = "SEL4_DANGEROUS_CODE_INJECTION")]
 pub unsafe fn seL4_DebugRun(userfn: extern fn(*mut u8), userarg: *mut u8) {
     let userfnptr = userfn as *mut ();
     let scno = SyscallId::DebugRun as seL4_Word;
@@ -644,6 +645,7 @@ pub unsafe fn seL4_DebugRun(userfn: extern fn(*mut u8), userarg: *mut u8) {
 }
 
 #[inline(always)]
+#[cfg(feature = "SEL4_CONFIG_BENCHMARK")]
 pub unsafe fn seL4_BenchmarkResetLog() {
     let scno = SyscallId::BenchmarkResetLog as seL4_Word;
     asm!("swi $0"
@@ -655,6 +657,7 @@ pub unsafe fn seL4_BenchmarkResetLog() {
 }
 
 #[inline(always)]
+#[cfg(feature = "SEL4_CONFIG_BENCHMARK")]
 pub unsafe fn seL4_BenchmarkDumpLog(mut start: seL4_Word, size: seL4_Word) -> u32 {
     let scno = SyscallId::BenchmarkDumpLog as seL4_Word;
     asm!("swi $1"
@@ -669,6 +672,7 @@ pub unsafe fn seL4_BenchmarkDumpLog(mut start: seL4_Word, size: seL4_Word) -> u3
 }
 
 #[inline(always)]
+#[cfg(feature = "SEL4_CONFIG_BENCHMARK")]
 pub unsafe fn seL4_BenchmarkLogSize() -> u32 {
     let mut size = 0;
     let scno = SyscallId::BenchmarkLogSize as seL4_Word;
@@ -682,6 +686,7 @@ pub unsafe fn seL4_BenchmarkLogSize() -> u32 {
 }
 
 #[inline(always)]
+#[cfg(feature = "SEL4_CONFIG_BENCHMARK")]
 pub unsafe fn seL4_BenchmarkFinalizeLog() {
     let scno = SyscallId::BenchmarkFinalizeLog as seL4_Word;
     asm!("swi $0"

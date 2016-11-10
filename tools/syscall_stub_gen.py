@@ -61,6 +61,7 @@ WORD_SIZE_BITS_ARCH = {
 MESSAGE_REGISTERS_FOR_ARCH = {
     "aarch32": 4,
     "ia32": 2,
+    "x86_64": 2,
     "arm_hyp": 4,
 }
 
@@ -80,6 +81,7 @@ TYPE_TRANS = {
     "seL4_Uint64": "u64",
     "seL4_Bool": "u8",
     "seL4_CapData_t": "seL4_CapData",
+    "seL4_PrioProps_t": "seL4_PrioProps",
 }
 
 INCLUDES = [
@@ -255,6 +257,7 @@ def init_data_types(wordsize):
 
         # seL4 Structures
         BitFieldType("seL4_CapData_t", wordsize, wordsize),
+        BitFieldType("seL4_PrioProps_t", wordsize, wordsize),
 
         # Object types
         CapType("seL4_CPtr", wordsize),
@@ -306,8 +309,34 @@ def init_arch_types(wordsize):
             CapType("seL4_X86_PageDirectory", wordsize),
             CapType("seL4_X86_PageTable", wordsize),
             CapType("seL4_X86_IOPageTable", wordsize),
+            CapType("seL4_X86_VCPU", wordsize),
+            CapType("seL4_X86_EPTPML4", wordsize),
+            CapType("seL4_X86_EPTPDPT", wordsize),
+            CapType("seL4_X86_EPTPD", wordsize),
+            CapType("seL4_X86_EPTPT", wordsize),
+            StructType("seL4_VCPUContext", wordsize * 7 ,wordsize),
             StructType("seL4_UserContext", wordsize * 13, wordsize),
-        ]
+        ],
+        "x86_64" : [
+            Type("seL4_X86_VMAttributes", wordsize, wordsize),
+            CapType("seL4_X86_IOPort", wordsize),
+            CapType("seL4_X86_ASIDControl", wordsize),
+            CapType("seL4_X86_ASIDPool", wordsize),
+            CapType("seL4_X86_IOSpace", wordsize),
+            CapType("seL4_X86_Page", wordsize),
+            CapType("seL4_X64_PML4", wordsize),
+            CapType("seL4_X86_PDPT", wordsize),
+            CapType("seL4_X86_PageDirectory", wordsize),
+            CapType("seL4_X86_PageTable", wordsize),
+            CapType("seL4_X86_IOPageTable", wordsize),
+            CapType("seL4_X86_VCPU", wordsize),
+            CapType("seL4_X86_EPTPML4", wordsize),
+            CapType("seL4_X86_EPTPDPT", wordsize),
+            CapType("seL4_X86_EPTPD", wordsize),
+            CapType("seL4_X86_EPTPT", wordsize),
+            StructType("seL4_VCPUContext", wordsize * 7 ,wordsize),
+            StructType("seL4_UserContext", wordsize * 19, wordsize),
+        ],
     }
 
     return arch_types
@@ -574,8 +603,7 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
     #
     # Setup variables we will need.
     #
-    if returning_struct:
-        result.append("\tlet mut result: %s = ::core::mem::zeroed();" % return_type)
+    result.append("\tlet mut result: %s = ::core::mem::zeroed();" % return_type)
     result.append("\tlet tag = seL4_MessageInfo::new(InvocationLabel::%s as u32, 0, %d, %d);"  % (method_id, len(cap_expressions), len(input_expressions)))
     result.append("\tlet output_tag;")
     for i in range(min(num_mrs, max(input_param_words, output_param_words))):
@@ -629,7 +657,23 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
         result.append("\toutput_tag = seL4_CallWithMRs(%s, tag," % (service_cap))
         result.append("\t\t%s);" % ', '.join(
             [call_arguments[i] for i in range(num_mrs)]))
+
+    #
+    # Prepare the result.
+    #
+    label = "result.error" if returning_struct else "result"
+    result.append("\t%s = output_tag.get_label() as _;" % label);
     result.append("")
+
+    if not use_only_ipc_buffer:
+        result.append("\t/* Unmarshal registers into IPC buffer on error. */")
+        result.append("\tif (%s != seL4_Error::seL4_NoError as u32) {" % label)
+        for i in range(num_mrs):
+            result.append("\t\tseL4_SetMR(%d, mr%d);" % (i, i))
+        if returning_struct:
+            result.append("\t\treturn result;")
+        result.append("\t}")
+        result.append("")
 
     #
     # Generate unmarshalling code.
@@ -644,6 +688,7 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
                 source_words["w%d" % i] = "seL4_GetMR(%d)" % i
         unmashalled_params = generate_unmarshal_expressions(output_params, wordsize)
         for (param, words) in unmashalled_params:
+            param.name = translate_expr(param.name)
             if param.type.pass_by_reference():
                 members = struct_members(param.type, structs)
                 for i in range(len(words)):
@@ -663,13 +708,13 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
     # Return result
     if returning_struct:
         result.append("\tresult.error = output_tag.get_label() as isize;")
-        result.append("\tresult")
     else:
-        result.append("\toutput_tag.get_label() as isize")
+        result.append("\tresult = output_tag.get_label() as isize;")
 
     #
     # }
     #
+    result.append("\treturn result;")
     result.append("}")
 
     return "\n".join(result) + "\n"
@@ -702,7 +747,7 @@ def parse_xml_file(input_file, valid_types):
         for method in interface.getElementsByTagName("method"):
             method_name = method.getAttribute("name")
             method_id = method.getAttribute("id")
-            method_config = method.getAttribute("config")
+            method_condition = method.getAttribute("condition")
 
             #
             # Get parameters.
@@ -722,7 +767,7 @@ def parse_xml_file(input_file, valid_types):
                     input_params.append(Parameter(param_name, param_type))
                 else:
                     output_params.append(Parameter(param_name, param_type))
-            methods.append((interface_name, method_name, method_id, input_params, output_params, method_config))
+            methods.append((interface_name, method_name, method_id, input_params, output_params, method_condition))
 
     return (methods, structs)
 
@@ -775,9 +820,16 @@ def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_bu
     result.append("/*")
     result.append(" * Generated stubs.")
     result.append(" */")
-    for (interface_name, method_name, method_id, inputs, outputs, config) in methods:
-        if config != "":
-            result.append("#[cfg(%s)]" % config)
+    for (interface_name, method_name, method_id, inputs, outputs, condition) in methods:
+        if condition != "":
+            # ugly hacks to work around use of CPP expressions in condition
+            condition = condition.replace('defined', '')
+            condition = condition.replace('(', '')
+            condition = condition.replace(')', '')
+            if 'CONFIG_' in condition:
+                condition = 'feature = "' + condition + '"'
+            if '>' not in condition:
+                result.append("#[cfg(%s)]" % condition)
         result.append(generate_stub(arch, wordsize, interface_name, method_name,
                                     method_id, inputs, outputs, structs, use_only_ipc_buffer))
 
@@ -847,3 +899,4 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+

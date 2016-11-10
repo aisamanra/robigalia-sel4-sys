@@ -6,7 +6,7 @@
 # except according to those terms.
 [package]
 name = "sel4-sys"
-version = "0.0.22"
+version = "0.0.23"
 authors = ["Corey Richardson <corey@octayn.net>"]
 description = "Rust interface to the seL4 kernel"
 documentation = "https://doc.robigalia.org/sel4_sys"
@@ -19,6 +19,12 @@ build = "build.rs"
 unstable = []
 SEL4_DANGEROUS_CODE_INJECTION = []
 SEL4_CONFIG_BENCHMARK = []
+CONFIG_HARDWARE_DEBUG_API = []
+# note: if you're looking at these, be aware that hypervisor support is not
+# yet available at all. these features shouldn't be enabled.
+CONFIG_VTX = []
+CONFIG_ARM_SMMU = []
+CONFIG_ARM_HYPERVISOR_SUPPORT = []
 
 [lib]
 path = "lib.rs"
