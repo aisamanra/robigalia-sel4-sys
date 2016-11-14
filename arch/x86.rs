@@ -274,7 +274,7 @@ unsafe fn x86_sys_send_recv(sys: seL4_Word, dest: seL4_Word, out_badge: *mut seL
             "{di}" (*in_out_mr1),
             "{cx}" (*in_out_mr2),
             "{dx}" (dest)
-          : "%edx", "memory"
+          : "memory"
           : "volatile");
 }
 
