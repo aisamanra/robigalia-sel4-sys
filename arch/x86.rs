@@ -228,7 +228,7 @@ unsafe fn x86_sys_send_null(sys: seL4_Word, mut dest: seL4_Word, info: seL4_Word
           sysenter
           popl %ebx
           popl %ebp"
-          : "={dx}" (src)
+          : "={dx}" (dest)
           : "{ax}" (sys),
             "{si}" (info),
             "{dx}" (dest)
