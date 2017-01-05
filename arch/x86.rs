@@ -17,12 +17,27 @@ pub type seL4_CPtr = seL4_Word;
 pub const seL4_WordBits: usize = 32;
 pub const seL4_PageBits: usize = 12;
 pub const seL4_SlotBits: usize = 4;
-pub const seL4_TCBBits: usize = 10;
+pub const seL4_TCBBits: usize = 11;
 pub const seL4_EndpointBits: usize = 4;
+pub const seL4_NotificationBits: usize = 4;
 pub const seL4_PageTableBits: usize = 12;
 pub const seL4_PageDirBits: usize = 12;
 pub const seL4_IOPageTableBits: usize = 12;
 pub const seL4_ASIDPoolBits: usize = 12;
+
+pub const seL4_HugePageBits: usize = 30;
+
+pub const seL4_VCPUBits: usize = 14;
+pub const seL4_EPTPML4Bits: usize = 12;
+pub const seL4_EPTPDPTBits: usize = 12;
+pub const seL4_EPTPDBits: usize = 12;
+pub const seL4_EPTPTBits: usize = 12;
+
+pub const seL4_PDPTBits: usize = 5;
+pub const seL4_LargePageBits: usize = 21;
+
+pub const seL4_MinUntypedBits: usize = 4;
+pub const seL4_MaxUntypedBits: usize = 29;
 
 pub type seL4_X86_ASIDControl = seL4_CPtr;
 pub type seL4_X86_ASIDPool = seL4_CPtr;
@@ -45,12 +60,17 @@ pub enum seL4_ObjectType {
     seL4_EndpointObject,
     seL4_NotificationObject,
     seL4_CapTableObject,
+    seL4_IA32_PDPTObject,
     seL4_X86_4K,
-    seL4_X86_LargePage,
+    seL4_X86_LargePageObject,
     seL4_X86_PageTableObject,
     seL4_X86_PageDirectoryObject,
-    seL4_X86_PDPTObject,
     seL4_X86_IOPageTableObject,
+    seL4_X86_VCPUObject,
+    seL4_X86_EPTPML4Object,
+    seL4_X86_EPTPDPTObject,
+    seL4_X86_EPTPDObject,
+    seL4_X86_EPTPTObject,
 }
 
 #[repr(u32)]
@@ -79,18 +99,6 @@ pub struct seL4_UserContext {
     pub tls_base: seL4_Word,
     pub fs: seL4_Word,
     pub gs: seL4_Word,
-}
-
-#[inline(always)]
-pub unsafe fn seL4_GetTag() -> seL4_MessageInfo {
-    let mut tag: seL4_MessageInfo = uninitialized();
-    asm!("movl %fs:0, $0" : "=r"(tag.words[0]) : : : "volatile");
-    tag
-}
-
-#[inline(always)]
-pub unsafe fn seL4_SetTag(tag: seL4_MessageInfo) {
-    asm!("movl $0, %fs:0" : : "r"(tag.words[0]) : "memory" : "volatile");
 }
 
 #[inline(always)]
@@ -210,7 +218,7 @@ unsafe fn x86_sys_reply(sys: seL4_Word, info: seL4_Word, mr1: seL4_Word, mr2: se
 }
 
 #[inline(always)]
-unsafe fn x86_sys_send_null(sys: seL4_Word, mut src: seL4_Word, info: seL4_Word) {
+unsafe fn x86_sys_send_null(sys: seL4_Word, mut dest: seL4_Word, info: seL4_Word) {
     asm!("pushl %ebp
           pushl %ebx
           movl %esp, %ecx
@@ -223,7 +231,7 @@ unsafe fn x86_sys_send_null(sys: seL4_Word, mut src: seL4_Word, info: seL4_Word)
           : "={dx}" (src)
           : "{ax}" (sys),
             "{si}" (info),
-            "{dx}" (src)
+            "{dx}" (dest)
           : "%ecx"
           : "volatile");
 }
@@ -267,7 +275,7 @@ unsafe fn x86_sys_send_recv(sys: seL4_Word, dest: seL4_Word, out_badge: *mut seL
           popl %ebp"
           : "={si}" (*out_info)
             "={di}" (*in_out_mr1),
-            "={cx}" (*in_out_mr1),
+            "={cx}" (*in_out_mr2),
             "={dx}" (*out_badge)
           : "{ax}" (sys),
             "{si}" (info),

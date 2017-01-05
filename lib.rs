@@ -15,7 +15,8 @@
 
 #[cfg(not(any(
     all(target_arch = "arm", target_pointer_width = "32"),
-    all(target_arch = "x86", target_pointer_width = "32")
+    all(target_arch = "x86"),
+    all(target_arch = "x86_64"),
  )))]
 use architecture_not_supported_sorry;
 
@@ -34,14 +35,6 @@ pub use seL4_ObjectType::*;
 // only what the size of the enums ought to be. Each arch then invokes it.
 macro_rules! error_types {
     ($int_width:ident) => {
-        bitflags! {
-            pub flags seL4_CapRights: $int_width {
-                const seL4_CanWrite = 0x1,
-                const seL4_CanRead = 0x2,
-                const seL4_CanGrant = 0x4
-            }
-        }
-
         #[repr($int_width)]
         #[derive(Debug, Copy, Clone, PartialEq, Eq)]
         pub enum seL4_Error {
@@ -83,25 +76,39 @@ macro_rules! error_types {
 }
 
 
-#[cfg(all(target_arch = "x86", target_pointer_width = "32"))]
+#[cfg(target_arch = "x86")]
 include!("arch/x86.rs");
+
+#[cfg(target_arch = "x86_64")]
+include!("arch/x86_64.rs");
 
 #[cfg(all(target_arch = "arm", target_pointer_width = "32"))]
 include!("arch/arm.rs");
 
-#[cfg(all(target_arch = "x86", target_pointer_width = "32"))]
+#[cfg(all(target_arch = "x86"))]
 include!(concat!(env!("OUT_DIR"), "/ia32_invocation.rs"));
+
+#[cfg(all(target_arch = "x86_64"))]
+include!(concat!(env!("OUT_DIR"), "/x86_64_invocation.rs"));
 
 #[cfg(all(target_arch = "arm", target_pointer_width = "32"))]
 include!(concat!(env!("OUT_DIR"), "/aarch32_invocation.rs"));
 
-#[cfg(all(target_arch = "x86", target_pointer_width = "32"))]
+#[cfg(all(target_arch = "x86"))]
 include!(concat!(env!("OUT_DIR"), "/ia32_syscall_stub.rs"));
+
+#[cfg(all(target_arch = "x86_64"))]
+include!(concat!(env!("OUT_DIR"), "/x86_64_syscall_stub.rs"));
 
 #[cfg(all(target_arch = "arm", target_pointer_width = "32"))]
 include!(concat!(env!("OUT_DIR"), "/aarch32_syscall_stub.rs"));
 
-include!(concat!(env!("OUT_DIR"), "/types.rs"));
+#[cfg(target_pointer_width = "32")]
+include!(concat!(env!("OUT_DIR"), "/types32.rs"));
+
+#[cfg(target_pointer_width = "64")]
+include!(concat!(env!("OUT_DIR"), "/types64.rs"));
+
 include!(concat!(env!("OUT_DIR"), "/syscalls.rs"));
 
 pub type seL4_CNode = seL4_CPtr;
@@ -174,39 +181,23 @@ pub struct seL4_SlotRegion {
     pub end: seL4_Word,   /* first CNode slot position AFTER region */
 }
 
-// next release
-//
-//#[repr(C)]
-//#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-//pub struct seL4_UntypedDesc {
-//    /// Physical address corresponding of the untyped object's backing memory
-//    pub paddr: seL4_Word,
-//    pub padding1: u8,
-//    pub padding2: u8,
-//    /// log2 size of the region of memory backing the untyped object
-//    pub size_bits: u8,
-//    /// Whether the backing memory corresponds to some device memory
-//    pub is_device: u8,
-//}
-
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-/// Region of device memory
-pub struct seL4_DeviceRegion {
-    /// Base physical address of the device region
-    pub basePaddr: seL4_Word,     /* base physical address of device region */
-    /// log2 size of a device region frame
-    pub frameSizeBits: seL4_Word,
-    /// Frame caps for the pages in the device region
-    pub frames: seL4_SlotRegion,
+pub struct seL4_UntypedDesc {
+    /// Physical address corresponding of the untyped object's backing memory
+    pub paddr: seL4_Word,
+    pub padding1: u8,
+    pub padding2: u8,
+    /// log2 size of the region of memory backing the untyped object
+    pub sizeBits: u8,
+    /// Whether the backing memory corresponds to some device memory
+    pub isDevice: u8,
 }
 
-/* XXX: These MUST match the kernel config at build-time. */
-pub const CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS: usize = 166;
-pub const CONFIG_MAX_NUM_BOOTINFO_DEVICE_REGIONS: usize = 199;
+// explicitly *not* Copy. the array at the end is tricky to handle.
 
 #[repr(C)]
-#[derive(Copy)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct seL4_BootInfo {           
     /// ID [0..numNodes-1] of the current node (0 if uniprocessor)
     pub nodeID: seL4_Word,          
@@ -224,27 +215,21 @@ pub struct seL4_BootInfo {
     pub userImageFrames: seL4_SlotRegion,
     /// PD caps used for the loaded ELF image of the root task
     pub userImagePaging: seL4_SlotRegion,
-    /// Untyped object caps
-    pub untyped: seL4_SlotRegion,
     /// IOSpace caps for ARM SMMU
     pub ioSpaceCaps: seL4_SlotRegion,
-    /// Physical addresses of caps in untyped
-    pub untypedPaddrList:   [seL4_Word; CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS],
-    /// log2 size of caps in untyped
-    pub untypedSizeBitsList: [u8; CONFIG_MAX_NUM_BOOTINFO_UNTYPED_CAPS],
     /// log2 size of root task's CNode
     pub initThreadCNodeSizeBits: u8,
-    /// Number of populated device regions
-    pub numDeviceRegions: seL4_Word,
-    /// Untyped caps corresponding to devices the kernel found
-    pub deviceRegions: [seL4_DeviceRegion; CONFIG_MAX_NUM_BOOTINFO_DEVICE_REGIONS],
     /// Root task's domain ID
     pub initThreadDomain: u32,
-}
-
-impl ::core::clone::Clone for seL4_BootInfo {
-    fn clone(&self) -> Self {
-        // yay [T; n]
-        *self
-    }
+    /// TSC frequency on x86, unused on ARM.
+    pub archInfo: seL4_Word,
+    /// Untyped object caps
+    pub untyped: seL4_SlotRegion,
+    /// Information about each untyped cap
+    /// 
+    /// *Note*! This is actually an array! The actual length depends on kernel
+    /// configuration which we have no way of knowing at this point. Instead, make a new slice
+    /// from_raw_parts with a pointer to the first element of this, and with a length of
+    /// (bi.untyped.end - bi.untyped.start). Then index *that* as usual.
+    pub untypedList: seL4_UntypedDesc,
 }

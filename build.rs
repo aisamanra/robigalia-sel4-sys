@@ -15,7 +15,7 @@ use std::env;
 
 fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
-    let arches = [("ia32", "x86", 32), ("aarch32", "arm", 32)];
+    let arches = [("ia32", "x86", 32), ("x86_64", "x86", 64), ("aarch32", "arm", 32)];
     for &(arch, archdir, word_size) in &arches {
         let word_size = format!("{}", word_size);
         let outfile = format!("{}/{}_syscall_stub.rs", out_dir, arch);
@@ -54,7 +54,7 @@ fn main() {
     assert!(cmd.status().unwrap().success());
 
     let bfin = File::open("seL4/libsel4/include/sel4/types_32.bf").unwrap();
-    let bfout = File::create(&*format!("{}/types.rs", out_dir)).unwrap();
+    let bfout = File::create(&*format!("{}/types32.rs", out_dir)).unwrap();
     let mut cmd = Command::new("/usr/bin/env");
     cmd.arg("python")
        .arg("tools/bitfield_gen.py")
@@ -66,7 +66,31 @@ fn main() {
     std::mem::forget(bfout);
 
     let bfin = File::open("seL4/libsel4/include/sel4/shared_types_32.bf").unwrap();
-    let bfout = OpenOptions::new().append(true).open(&*format!("{}/types.rs", out_dir)).unwrap();
+    let bfout = OpenOptions::new().append(true).open(&*format!("{}/types32.rs", out_dir)).unwrap();
+    let mut cmd = Command::new("/usr/bin/env");
+    cmd.arg("python")
+       .arg("tools/bitfield_gen.py")
+       .stdin(unsafe { Stdio::from_raw_fd(bfin.as_raw_fd()) })
+       .stdout(unsafe { Stdio::from_raw_fd(bfout.as_raw_fd()) });
+    println!("Running {:?}", cmd);
+    assert!(cmd.status().unwrap().success());
+    std::mem::forget(bfin);
+    std::mem::forget(bfout);
+
+    let bfin = File::open("seL4/libsel4/include/sel4/types_64.bf").unwrap();
+    let bfout = File::create(&*format!("{}/types64.rs", out_dir)).unwrap();
+    let mut cmd = Command::new("/usr/bin/env");
+    cmd.arg("python")
+       .arg("tools/bitfield_gen.py")
+       .stdin(unsafe { Stdio::from_raw_fd(bfin.as_raw_fd()) })
+       .stdout(unsafe { Stdio::from_raw_fd(bfout.as_raw_fd()) });
+    println!("Running {:?}", cmd);
+    assert!(cmd.status().unwrap().success());
+    std::mem::forget(bfin);
+    std::mem::forget(bfout);
+
+    let bfin = File::open("seL4/libsel4/include/sel4/shared_types_64.bf").unwrap();
+    let bfout = OpenOptions::new().append(true).open(&*format!("{}/types64.rs", out_dir)).unwrap();
     let mut cmd = Command::new("/usr/bin/env");
     cmd.arg("python")
        .arg("tools/bitfield_gen.py")

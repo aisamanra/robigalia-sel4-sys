@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #
-# Copyright 2015, Corey Richardson
+# Copyright 2017, Corey Richardson
 # Copyright 2014, NICTA
 #
 # This software may be distributed and modified according to the terms of
@@ -44,6 +44,8 @@ from __future__ import division, print_function
 #     XML method descriptions are added.
 #
 
+import operator
+import itertools
 import xml.dom.minidom
 from argparse import ArgumentParser
 import sys
@@ -61,7 +63,7 @@ WORD_SIZE_BITS_ARCH = {
 MESSAGE_REGISTERS_FOR_ARCH = {
     "aarch32": 4,
     "ia32": 2,
-    "x86_64": 2,
+    "x86_64": 4,
     "arm_hyp": 4,
 }
 
@@ -82,8 +84,10 @@ TYPE_TRANS = {
     "seL4_Bool": "u8",
     "seL4_CapData_t": "seL4_CapData",
     "seL4_PrioProps_t": "seL4_PrioProps",
+    "seL4_CapRights_t": "seL4_CapRights",
 }
 
+# Headers to include
 INCLUDES = [
     'autoconf.h', 'sel4/types.h'
 ]
@@ -111,6 +115,8 @@ TYPES = {
     32: "u32",
     64: "u64"
 }
+
+DEFAULT_CAP_DESC = "The capability to the %(interface_manual_name)s which is being operated on."
 
 class Type(object):
     """
@@ -166,10 +172,7 @@ class Type(object):
         of this type.
         """
         assert word_num == 0
-        if self.name == "seL4_CapRights":
-            return "%s.bits()" % var_name
-        else:
-            return "%s" % var_name
+        return "%s" % var_name
 
     def double_word_expression(self, var_name, word_num, word_size):
 
@@ -178,7 +181,7 @@ class Type(object):
         if word_num == 0:
             return "{1} as {0}".format(TYPES[self.size_bits], var_name)
         elif word_num == 1:
-            return "({1} >> {2}) as {0}".format(TYPES[self.size_bits], var_name, 
+            return "{1}.wrapping_shr({2}) as {0}".format(TYPES[self.size_bits], var_name, 
                                                 word_size)
 
 
@@ -239,13 +242,18 @@ class Parameter(object):
         self.name = name
         self.type = type
 
+class Api(object):
+    def __init__(self, name):
+        self.name = name
+
 #
 # Types
 #
 def init_data_types(wordsize):
     types = [
         # Simple Types
-        Type("int", wordsize, wordsize),
+        Type("int", 32, wordsize),
+        Type("long", wordsize, wordsize),
 
         Type("seL4_Uint8", 8, wordsize),
         Type("seL4_Uint16", 16, wordsize),
@@ -253,11 +261,11 @@ def init_data_types(wordsize):
         Type("seL4_Uint64", 64, wordsize, double_word=(wordsize == 32)),
         Type("seL4_Word", wordsize, wordsize),
         Type("seL4_Bool", 1, wordsize, native_size_bits=8),
-        Type("seL4_CapRights", wordsize, wordsize),
 
         # seL4 Structures
         BitFieldType("seL4_CapData_t", wordsize, wordsize),
         BitFieldType("seL4_PrioProps_t", wordsize, wordsize),
+        BitFieldType("seL4_CapRights_t", wordsize, wordsize),
 
         # Object types
         CapType("seL4_CPtr", wordsize),
@@ -317,6 +325,7 @@ def init_arch_types(wordsize):
             StructType("seL4_VCPUContext", wordsize * 7 ,wordsize),
             StructType("seL4_UserContext", wordsize * 13, wordsize),
         ],
+
         "x86_64" : [
             Type("seL4_X86_VMAttributes", wordsize, wordsize),
             CapType("seL4_X86_IOPort", wordsize),
@@ -336,7 +345,7 @@ def init_arch_types(wordsize):
             CapType("seL4_X86_EPTPT", wordsize),
             StructType("seL4_VCPUContext", wordsize * 7 ,wordsize),
             StructType("seL4_UserContext", wordsize * 19, wordsize),
-        ],
+        ]
     }
 
     return arch_types
@@ -439,7 +448,7 @@ def generate_marshal_expressions(params, num_mrs, structs, wordsize):
             expr = "(%s & %#x%s)" % (expr, (1 << num_bits) - 1, 
                                      WORD_CONST_SUFFIX_BITS[wordsize])
             if target_offset:
-                expr = "((%s as seL4_Word) << %d)" % (expr, target_offset)
+                expr = "(%s as seL4_Word).wrapping_shl(%d)" % (expr, target_offset)
             word_array[target_word].append(expr)
             return
 
@@ -494,7 +503,7 @@ def generate_unmarshal_expressions(params, wordsize):
             return ["(%%(w%d)s & %#x)" % (
                 first_word, (1 << num_bits) - 1)]
         else:
-            return ["(%%(w%d)s >> %d) & %#x" % (
+            return ["(%%(w%d)s.wrapping_shr(%d)) & %#x" % (
                 first_word, bit_offset, (1 << num_bits) - 1)]
 
     # Get their marshalling positions
@@ -547,7 +556,7 @@ def generate_result_struct(interface_name, method_name, output_params):
 
     return "\n".join(result)
 
-def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_params, output_params, structs, use_only_ipc_buffer):
+def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_params, output_params, structs, use_only_ipc_buffer, comment):
     result = []
 
     if use_only_ipc_buffer:
@@ -572,6 +581,11 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
         returning_struct = True
     else:
         return_type = "isize"
+
+    #
+    # Print doxygen comment.
+    #
+    result.append(comment)
 
     #
     # Print function header.
@@ -604,9 +618,9 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
     # Setup variables we will need.
     #
     result.append("\tlet mut result: %s = ::core::mem::zeroed();" % return_type)
-    result.append("\tlet tag = seL4_MessageInfo::new(InvocationLabel::%s as u32, 0, %d, %d);"  % (method_id, len(cap_expressions), len(input_expressions)))
+    result.append("\tlet tag = seL4_MessageInfo::new(InvocationLabel::%s as seL4_Word, 0, %d, %d);"  % (method_id, len(cap_expressions), len(input_expressions)))
     result.append("\tlet output_tag;")
-    for i in range(min(num_mrs, max(input_param_words, output_param_words))):
+    for i in range(num_mrs):
         result.append("\tlet mut mr%d: seL4_Word = 0;" % i)
     result.append("")
 
@@ -629,26 +643,24 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
     #   seL4_SetMR(i, v);
     #   ...
     #
-    if len(input_expressions) > 0:
-        result.append("\t/* Marshal input parameters. */")
-        for i in range(len(input_expressions)):
-            if input_expressions[i] == "type":
-                input_expressions[i] = "type_"
-            if i < num_mrs:
+    if max(num_mrs, len(input_expressions)) > 0:
+        result.append("\t/* Marshal and initialize parameters. */")
+        # Initialize in-register parameters
+        for i in range(num_mrs):
+            if i < len(input_expressions):
                 result.append("\tmr%d = %s as seL4_Word;" % (i, input_expressions[i]))
             else:
-                result.append("\tseL4_SetMR(%d, %s);" % (i, input_expressions[i]))
+                result.append("\tmr%d = 0;" % i)
+        # Initialize buffered parameters
+        for i in range(num_mrs, len(input_expressions)):
+            if input_expressions[i] == "type":
+                input_expressions[i] = "type_"
+            result.append("\tseL4_SetMR(%d, %s);" % (i, input_expressions[i]))
         result.append("")
 
     #
     # Generate the call.
     #
-    call_arguments = []
-    for i in range(num_mrs):
-        if i < max(input_param_words, output_param_words):
-            call_arguments.append("&mut mr%d" % i)
-        else:
-            call_arguments.append("::core::ptr::null_mut()")
     if use_only_ipc_buffer:
         result.append("\t/* Perform the call. */")
         result.append("\toutput_tag = seL4_Call(%s, tag);" % service_cap)
@@ -656,7 +668,7 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
         result.append("\t/* Perform the call, passing in-register arguments directly. */")
         result.append("\toutput_tag = seL4_CallWithMRs(%s, tag," % (service_cap))
         result.append("\t\t%s);" % ', '.join(
-            [call_arguments[i] for i in range(num_mrs)]))
+            ("&mut mr%d" % i) for i in range(num_mrs)))
 
     #
     # Prepare the result.
@@ -696,20 +708,12 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
                                   (param.name, members[i], words[i] % source_words))
             else:
                 if param.type.double_word:
-                    result.append("\tresult.%s = ((%s)%s + ((%s)%s << 32));" % 
+                    result.append("\tresult.%s = ((%s)%s + ((%s)%s.wrapping_shr(32)));" % 
                                   (param.name, TYPES[64], words[0] % source_words, 
                                    TYPES[64], words[1] % source_words))
                 else:
                     for word in words:
                         result.append("\tresult.%s = %s;" % (param.name, construction(word % source_words, param)))
-
-        result.append("")
-
-    # Return result
-    if returning_struct:
-        result.append("\tresult.error = output_tag.get_label() as isize;")
-    else:
-        result.append("\tresult = output_tag.get_label() as isize;")
 
     #
     # }
@@ -718,6 +722,49 @@ def generate_stub(arch, wordsize, interface_name, method_name, method_id, input_
     result.append("}")
 
     return "\n".join(result) + "\n"
+
+def get_xml_element_contents(element):
+    """
+    Converts the contents of an xml element into a string, with all
+    child xml nodes unchanged.
+    """
+    return "".join([c.toxml() for c in element.childNodes])
+
+def get_xml_element_content_with_xmlonly(element):
+    """
+    Converts the contents of an xml element into a string, wrapping
+    all child xml nodes in doxygen @xmlonly/@endxmlonly keywords.
+    """
+
+    result = []
+    prev_element = False
+    for node in element.childNodes:
+        if node.nodeType == xml.dom.Node.TEXT_NODE:
+            if prev_element:
+                # text node following element node
+                result.append(" @endxmlonly ")
+            prev_element = False
+        else:
+            if not prev_element:
+                # element node following text node
+                result.append(" @xmlonly ")
+            prev_element = True
+
+        result.append(node.toxml())
+
+    return "".join(result)
+
+def normalise_text(text):
+    """
+    Removes leading and trailing whitespace from each line of text.
+    Removes leading and trailing blank lines from text.
+    """
+    stripped = text.strip()
+    stripped_lines = [line.strip() for line in text.split("\n")]
+    # remove leading and trailing empty lines
+    stripped_head = list(itertools.dropwhile(lambda s: not s, stripped_lines))
+    stripped_tail = itertools.dropwhile(lambda s: not s, reversed(stripped_head))
+    return "\n".join(reversed(list(stripped_tail)))
 
 def parse_xml_file(input_file, valid_types):
     """
@@ -734,6 +781,8 @@ def parse_xml_file(input_file, valid_types):
     structs = []
     doc = xml.dom.minidom.parse(input_file)
 
+    api = Api(doc.getElementsByTagName("api")[0].getAttribute("name"))
+
     for struct in doc.getElementsByTagName("struct"):
         _struct_members = []
         struct_name = struct.getAttribute("name")
@@ -744,17 +793,51 @@ def parse_xml_file(input_file, valid_types):
 
     for interface in doc.getElementsByTagName("interface"):
         interface_name = interface.getAttribute("name")
+        interface_manual_name = interface.getAttribute("manual_name") or interface_name
+        interface_cap_description = interface.getAttribute("cap_description") or DEFAULT_CAP_DESC % {"interface_manual_name": interface_manual_name}
         for method in interface.getElementsByTagName("method"):
             method_name = method.getAttribute("name")
             method_id = method.getAttribute("id")
             method_condition = method.getAttribute("condition")
+            method_manual_name = method.getAttribute("manual_name") or method_name
+            method_manual_label = method.getAttribute("manual_label") or \
+                    "%s_%s" % (interface_manual_name.lower(), method_name.lower())
+
+            comment_lines = ["@xmlonly <manual name=\"%s - %s\" label=\"%s\"/> @endxmlonly" %
+                    (interface_manual_name, method_manual_name, method_manual_label)]
+
+            method_brief = method.getElementsByTagName("brief")
+            if method_brief:
+                method_brief_text = get_xml_element_contents(method_brief[0])
+                normalised_method_brief_text = normalise_text(method_brief_text)
+                comment_lines.append("@brief @xmlonly %s @endxmlonly" % normalised_method_brief_text)
+
+            method_description = method.getElementsByTagName("description")
+            if method_description:
+                method_description_text = get_xml_element_contents(method_description[0])
+                normalised_method_description_text = normalise_text(method_description_text)
+                comment_lines.append("\n@xmlonly\n%s\n@endxmlonly\n" % normalised_method_description_text)
+
+            method_return_description = method.getElementsByTagName("return")
+            if method_return_description:
+                comment_lines.append("@return @xmlonly %s @endxmlonly" % get_xml_element_contents(method_return_description[0]))
+
 
             #
             # Get parameters.
             #
             # We always have an implicit cap parameter.
             #
-            input_params = [Parameter("service", type_names[interface_name])]
+            input_params = [Parameter("_service", type_names[interface_name])]
+
+            cap_description = interface_cap_description
+            cap_param = method.getElementsByTagName("cap_param")
+            if cap_param:
+                append_description = cap_param[0].getAttribute("append_description")
+                if append_description:
+                    cap_description += append_description
+
+            comment_lines.append("@param[in] _service %s" % cap_description)
             output_params = []
             for param in method.getElementsByTagName("param"):
                 param_name = param.getAttribute("name")
@@ -767,9 +850,26 @@ def parse_xml_file(input_file, valid_types):
                     input_params.append(Parameter(param_name, param_type))
                 else:
                     output_params.append(Parameter(param_name, param_type))
-            methods.append((interface_name, method_name, method_id, input_params, output_params, method_condition))
+                if param_dir == "in" or param_type.pass_by_reference():
+                    param_description = param.getAttribute("description")
+                    if not param_description:
+                        param_description_element = param.getElementsByTagName("description")
+                        if param_description_element:
+                            param_description_text = get_xml_element_content_with_xmlonly(param_description_element[0])
+                            param_description = normalise_text(param_description_text)
 
-    return (methods, structs)
+                    comment_lines.append("@param[%s] %s %s " % (param_dir, param_name, param_description))
+
+            # split each line on newlines
+            comment_lines = reduce(operator.add, [l.split("\n") for l in comment_lines], [])
+
+            # place the comment text in a c comment
+            comment = "\n".join(["/**"] + [" * %s" % l for l in comment_lines] + [" */"])
+
+            methods.append((interface_name, method_name, method_id, input_params, output_params, method_condition, comment))
+
+    return (methods, structs, api)
+
 
 def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_buffer):
     """
@@ -788,7 +888,7 @@ def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_bu
     methods = []
     structs = []
     for infile in input_files:
-        method, struct = parse_xml_file(infile, data_types + arch_types[arch])
+        method, struct, _ = parse_xml_file(infile, data_types + arch_types[arch])
         methods += method
         structs += struct
 
@@ -809,7 +909,7 @@ def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_bu
     result.append("/*")
     result.append(" * Return types for generated methods.")
     result.append(" */")
-    for (interface_name, method_name, _, _, output_params, _) in methods:
+    for (interface_name, method_name, _, _, output_params, _, _) in methods:
         results_structure = generate_result_struct(interface_name, method_name, output_params)
         if results_structure:
             result.append(results_structure)
@@ -820,7 +920,7 @@ def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_bu
     result.append("/*")
     result.append(" * Generated stubs.")
     result.append(" */")
-    for (interface_name, method_name, method_id, inputs, outputs, condition) in methods:
+    for (interface_name, method_name, method_id, inputs, outputs, condition, comment) in methods:
         if condition != "":
             # ugly hacks to work around use of CPP expressions in condition
             condition = condition.replace('defined', '')
@@ -831,7 +931,7 @@ def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_bu
             if '>' not in condition:
                 result.append("#[cfg(%s)]" % condition)
         result.append(generate_stub(arch, wordsize, interface_name, method_name,
-                                    method_id, inputs, outputs, structs, use_only_ipc_buffer))
+                                    method_id, inputs, outputs, structs, use_only_ipc_buffer, comment))
 
     # Write the output
     output = open(output_file, "w")
