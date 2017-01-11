@@ -1,10 +1,6 @@
 
 use core::mem::uninitialized;
 
-pub type seL4_Word = u64;
-pub type seL4_CPtr = seL4_Word;
-
-
 pub const seL4_WordBits: usize = 64;
 pub const seL4_PageBits: usize = 12;
 pub const seL4_SlotBits: usize = 5;
@@ -560,7 +556,7 @@ pub unsafe fn seL4_Yield() {
 //    fault
 //}
 
-#[inline(always)]
+//#[inline(always)]
 pub unsafe fn seL4_DebugPutChar(c: u8) {
     let mut unused0 = 0;
     let mut unused1 = 0;

@@ -76,6 +76,9 @@ macro_rules! error_types {
 }
 
 
+pub type seL4_Word = usize;
+pub type seL4_CPtr = usize;
+
 #[cfg(target_arch = "x86")]
 include!("arch/x86.rs");
 

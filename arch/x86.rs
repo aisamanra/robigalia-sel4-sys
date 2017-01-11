@@ -11,9 +11,6 @@
 
 use core::mem::uninitialized;
 
-pub type seL4_Word = u32;
-pub type seL4_CPtr = seL4_Word;
-
 pub const seL4_WordBits: usize = 32;
 pub const seL4_PageBits: usize = 12;
 pub const seL4_SlotBits: usize = 4;
@@ -556,7 +553,7 @@ pub unsafe fn seL4_DebugCapIdentify(mut cap: seL4_CPtr) -> u32 {
     let mut unused2 = 0;
     x86_sys_send_recv(SyscallId::DebugCapIdentify as seL4_Word, 
                       cap, &mut cap, 0, &mut unused0, &mut unused1, &mut unused2);
-    cap
+    cap as _
 }
 
 /// Note: name MUST be NUL-terminated.

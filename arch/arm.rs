@@ -24,9 +24,6 @@ pub const seL4_Frame_HasNPC: usize = 0;
 
 pub const seL4_GlobalsFrame: *mut u8 = 0xffffc000 as *mut u8;
 
-pub type seL4_Word = u32;
-pub type seL4_CPtr = seL4_Word;
-
 pub type seL4_ARM_Page = seL4_CPtr;
 pub type seL4_ARM_PageTable = seL4_CPtr;
 pub type seL4_ARM_PageDirectory = seL4_CPtr;
@@ -612,7 +609,7 @@ pub unsafe fn seL4_DebugCapIdentify(mut cap: seL4_CPtr) -> u32 {
 	  "{r7}" (scno)
 	: "memory"
     : "volatile");
-    cap
+    cap as _
 }
 
 // Note: name MUST be NUL-terminated.

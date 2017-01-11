@@ -379,7 +379,7 @@ class TaggedUnion:
 
         # Generate type
         print(type_template % \
-                        {"type": TYPES[self.base], \
+                        {"type": "usize", \
                          "name": self.name, \
                          "multiple": self.multiple}, file=output)
         print(file=output)
@@ -396,7 +396,7 @@ class TaggedUnion:
 
         subs = {\
             'union': self.name, \
-            'type':  TYPES[self.union_base], \
+            'type':  "usize", \
             'tagname': self.tagname, \
             'suf' : self.constant_suffix}
 
@@ -435,7 +435,7 @@ class TaggedUnion:
 
         for name, value, ref in self.tags:
             # Generate generators
-            arg_list = ["%s %s" % (TYPES[self.base], field) for \
+            arg_list = ["%s %s" % ("usize", field) for \
                             field in ref.visible_order if
                             field != self.tagname]
 
@@ -459,7 +459,7 @@ class TaggedUnion:
                 offset, size, high = ref.field_map[field]
 
                 if field == self.tagname:
-                    f_value = "(%s)%s_%s" % (TYPES[self.base], self.name, name)
+                    f_value = "(%s)%s_%s" % ("usize", self.name, name)
                 else:
                     f_value = field
 
@@ -539,7 +539,7 @@ class TaggedUnion:
                 subs = {\
                     "block": self.name, \
                     "field": field, \
-                    "type": TYPES[ref.base], \
+                    "type": "usize", \
                     "assert": ASSERTS, \
                     "index": index, \
                     "shift": shift, \
@@ -822,13 +822,13 @@ class Block:
 
         # Type definition
         print(type_template % \
-                        {"type": TYPES[self.base], \
+                        {"type": "usize", \
                          "name": self.name, \
                          "multiple": self.multiple}, file=output)
         print(file=output)
 
         # Generator
-        arg_list = ["%s: %s" % (field, TYPES[self.base]) for \
+        arg_list = ["%s: %s" % (field, "usize") for \
                         field in self.visible_order]
         if len(arg_list) == 0:
             args = 'void'
@@ -933,7 +933,7 @@ class Block:
             subs = {\
                 "block": self.name, \
                 "field": field, \
-                "type": TYPES[self.base], \
+                "type": "usize", \
                 "assert": ASSERTS, \
                 "index": index, \
                 "shift": shift, \
@@ -1027,9 +1027,11 @@ if __name__ == '__main__':
     parser.add_option('--skip_modifies', action='store_true', default=False)
     parser.add_option('--showclasses', action='store_true', default=False)
     parser.add_option('--debug', action='store_true', default=False)
+    parser.add_option('--word-size', action='store', dest='word_size')
 
     options, args = parser.parse_args()
     DEBUG = options.debug
+    word_size = int(options.word_size)
 
     if len(args) > 0:
         in_filename = args[0]
@@ -1055,6 +1057,9 @@ if __name__ == '__main__':
         for name, b in block_list.items():
             if not base in base_list:
                 raise ValueError("Invalid base size: %d" % base)
+            if base != word_size:
+                raise ValueError("Base size %d isn't word size %d" % (base,
+                    word_size))
             suffix = suffix_map[base]
             b.set_base(base, base_bits, base_sign_extend, suffix)
             blocks[name] = b
@@ -1071,6 +1076,9 @@ if __name__ == '__main__':
                 raise ValueError("Invalid base size: %d" % base)
             suffix = suffix_map[base]
             u.resolve(options, symtab)
+            if base != word_size:
+                raise ValueError("Base size %d isn't word size %d" % (base,
+                    word_size))
             u.set_base(base, base_bits, base_sign_extend, suffix)
 
     if not in_filename is None:

@@ -58,6 +58,7 @@ fn main() {
     let mut cmd = Command::new("/usr/bin/env");
     cmd.arg("python")
        .arg("tools/bitfield_gen.py")
+       .arg("--word-size=32")
        .stdin(unsafe { Stdio::from_raw_fd(bfin.as_raw_fd()) })
        .stdout(unsafe { Stdio::from_raw_fd(bfout.as_raw_fd()) });
     println!("Running {:?}", cmd);
@@ -70,6 +71,7 @@ fn main() {
     let mut cmd = Command::new("/usr/bin/env");
     cmd.arg("python")
        .arg("tools/bitfield_gen.py")
+       .arg("--word-size=32")
        .stdin(unsafe { Stdio::from_raw_fd(bfin.as_raw_fd()) })
        .stdout(unsafe { Stdio::from_raw_fd(bfout.as_raw_fd()) });
     println!("Running {:?}", cmd);
@@ -82,6 +84,7 @@ fn main() {
     let mut cmd = Command::new("/usr/bin/env");
     cmd.arg("python")
        .arg("tools/bitfield_gen.py")
+       .arg("--word-size=64")
        .stdin(unsafe { Stdio::from_raw_fd(bfin.as_raw_fd()) })
        .stdout(unsafe { Stdio::from_raw_fd(bfout.as_raw_fd()) });
     println!("Running {:?}", cmd);
@@ -94,6 +97,7 @@ fn main() {
     let mut cmd = Command::new("/usr/bin/env");
     cmd.arg("python")
        .arg("tools/bitfield_gen.py")
+       .arg("--word-size=64")
        .stdin(unsafe { Stdio::from_raw_fd(bfin.as_raw_fd()) })
        .stdout(unsafe { Stdio::from_raw_fd(bfout.as_raw_fd()) });
     println!("Running {:?}", cmd);
