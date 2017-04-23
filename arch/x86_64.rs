@@ -26,6 +26,15 @@ pub const seL4_ASIDPoolBits: usize = 12;
 pub const seL4_MinUntypedBits: usize = 4;
 pub const seL4_MaxUntypedBits: usize = 47;
 
+pub const seL4_NumHWBreakpoints: usize = 4;
+pub const seL4_FirstBreakpoint: usize = !1;
+pub const seL4_NumExclusiveBreakpoints: usize = 0;
+pub const seL4_FirstWatchpoint: usize = !1;
+pub const seL4_NumExclusiveWatchpoints: usize = 0;
+pub const seL4_FirstDualFunctionMonitor: usize = 0;
+pub const seL4_NumDualFunctionMonitors: usize = 4;
+
+
 pub type seL4_X86_ASIDControl = seL4_CPtr;
 pub type seL4_X86_ASIDPool = seL4_CPtr;
 pub type seL4_X86_IOSpace = seL4_CPtr;
@@ -45,23 +54,23 @@ pub const Default_VMAttributes: usize = 0;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum seL4_ObjectType {
     seL4_UntypedObject = 0,
-    seL4_TCBObject = 1,
-    seL4_EndpointObject = 2,
-    seL4_NotificationObject = 3,
-    seL4_CapTableObject = 4,
-    seL4_X86_PDPTObject = 5,
-    seL4_X64_PML4Object = 6,
-    seL4_X64_HugePageObject = 0xfffffffe,
-    seL4_X86_4K = 7,
-    seL4_X86_LargePageObject = 8,
-    seL4_X86_PageTableObject = 9,
-    seL4_X86_PageDirectoryObject = 10,
-    seL4_X86_IOPageTableObject = 0xffffff,
-    seL4_X86_VCPUObject = 0xfffffe,
-    seL4_X86_EPTPML4Object = 0xfffffd,
-    seL4_X86_EPTPDPTObject = 0xfffffc,
-    seL4_X86_EPTPDObject = 0xfffffb,
-    seL4_X86_EPTPTObject = 0xfffffa,
+    seL4_TCBObject,
+    seL4_EndpointObject,
+    seL4_NotificationObject,
+    seL4_CapTableObject,
+    seL4_X86_PDPTObject,
+    seL4_X64_PML4Object,
+    // seL4_X64_HugePageObject,
+    seL4_X86_4K,
+    seL4_X86_LargePageObject,
+    seL4_X86_PageTableObject,
+    seL4_X86_PageDirectoryObject,
+    seL4_X86_IOPageTableObject,
+    seL4_X86_VCPUObject,
+    seL4_X86_EPTPML4Object,
+    seL4_X86_EPTPDPTObject,
+    seL4_X86_EPTPDObject,
+    seL4_X86_EPTPTObject,
 }
 
 #[repr(u32)]
@@ -97,6 +106,92 @@ pub struct seL4_UserContext {
     pub r15: seL4_Word,
     pub tls_base: seL4_Word,
 }
+
+#[repr(C, packed)]
+pub struct seL4_VBEInfoBlock {
+    pub signature: [u8; 4],
+    pub version: u16,
+    pub oemStringPtr: u32,
+    pub capabilities: u32,
+    pub modeListPtr: u32,
+    pub totalMemory: u16,
+    pub oemSoftwareRev: u16,
+    pub oemVendorNamePtr: u32,
+    pub oemProductNamePtr: u32,
+    pub reserved: [u8; 222],
+    pub oemData: [u8; 256],
+}
+
+#[repr(C, packed)]
+pub struct seL4_VBEModeInfoBlock {
+    // all revisions
+    pub modeAttr: u16,
+    pub winAAttr: u8,
+    pub winBAttr: u8,
+    pub winGranularity: u16,
+    pub winSize: u16,
+    pub winASeg: u16,
+    pub winBSeg: u16,
+    pub winFuncPtr: u32,
+    pub bytesPerScanLine: u16,
+
+    // 1.2+
+    pub xRes: u16,
+    pub yRes: u16,
+    pub xCharSize: u8,
+    pub yCharSize: u8,
+    pub planes: u8,
+    pub bitsPerPixel: u8,
+    pub banks: u8,
+    pub memoryMmodel: u8,
+    pub bankSize: u8,
+    pub imagePages: u8,
+    pub reserved1: u8,
+
+    pub redLen: u8,
+    pub redOff: u8,
+    pub greenLen: u8,
+    pub greenOff: u8,
+    pub blueLen: u8,
+    pub blueOff: u8,
+    pub rsvdLen: u8,
+    pub rsvdOff: u8,
+    pub directColorInfo: u8,
+
+    // 2.0+
+    pub physBasePtr: u32,
+    pub reserved2: [u8; 6],
+
+    // 3.0+
+    pub linBytesPerScanLine: u16,
+    pub bnkImagePages: u8,
+    pub linImagePages: u8,
+    pub linRedLen: u8,
+    pub linRedOff: u8,
+    pub linGreenLen: u8,
+    pub linGreenOff: u8,
+    pub linBlueLen: u8,
+    pub linBlueOff: u8,
+    pub linRsvdLen: u8,
+    pub linRsvdOff: u8,
+    pub maxPixelClock: u32,
+    pub modeId: u16,
+    pub depth: u8,
+
+    pub reserved3: [u8; 187],
+}
+
+#[repr(C, packed)]
+pub struct seL4_X86_BootInfo_VBE {
+    pub header: seL4_BootInfoHeader,
+    pub vbeInfoBlock: seL4_VBEInfoBlock,
+    pub vbeModeInfoBlock: seL4_VBEModeInfoBlock,
+    pub vbeMode: u32,
+    pub vbeInterfaceSeg: u32,
+    pub vbeInterfaceOff: u32,
+    pub vbeInterfaceLen: u32,
+}
+
 
 #[inline(always)]
 pub unsafe fn seL4_GetMR(regnum: isize) -> seL4_Word {
@@ -537,24 +632,28 @@ pub unsafe fn seL4_Yield() {
     asm!("" ::: "memory" : "volatile");
 }
 
-//#[inline(always)]
-//pub unsafe fn seL4_VMEnter(vcpu: seL4_CPtr, sender: *mut seL4_Word) -> seL4_Word {
-//    let mut fault: seL4_Word = uninitialized();
-//    let mut badge: seL4_Word = uninitialized();
-//    let mut mr0 = seL4_GetMR(0);
-//    let mut mr1 = seL4_GetMR(1);
-//
-//    x64_sys_send_recv(SyscallId::VMEnter as seL4_Word, vcpu, &mut badge, 0, &mut fault, &mut mr0, &mut mr1);
-//
-//    seL4_SetMR(0, mr0);
-//    seL4_SetMR(1, mr1);
-//
-//    if fault == 0 && !sender.is_null() {
-//        *sender = badge;
-//    }
-//
-//    fault
-//}
+#[inline(always)]
+pub unsafe fn seL4_VMEnter(vcpu: seL4_CPtr, sender: *mut seL4_Word) -> seL4_Word {
+    let mut fault: seL4_Word = uninitialized();
+    let mut badge: seL4_Word = uninitialized();
+    let mut mr0 = seL4_GetMR(0);
+    let mut mr1 = seL4_GetMR(1);
+    let mut mr2 = seL4_GetMR(2);
+    let mut mr3 = seL4_GetMR(3);
+
+    x64_sys_send_recv(SyscallId::VMEnter as seL4_Word, vcpu, &mut badge, 0, &mut fault, &mut mr0, &mut mr1, &mut mr2, &mut mr3);
+
+    seL4_SetMR(0, mr0);
+    seL4_SetMR(1, mr1);
+    seL4_SetMR(2, mr2);
+    seL4_SetMR(3, mr3);
+
+    if fault == 0 && !sender.is_null() {
+        *sender = badge;
+    }
+
+    fault
+}
 
 //#[inline(always)]
 pub unsafe fn seL4_DebugPutChar(c: u8) {
@@ -633,8 +732,13 @@ pub unsafe fn seL4_BenchmarkResetLog() -> seL4_Word {
 #[inline(always)]
 #[cfg(feature = "SEL4_CONFIG_BENCHMARK")]
 pub unsafe fn seL4_BenchmarkFinalizeLog() {
-    x64_sys_null(SyscallId::BenchmarkFinalizeLog as seL4_Word);
-    asm!("" ::: "memory" : "volatile");
+    let mut unused0 = 0;
+    let mut unused1 = 0;
+    let mut unused2 = 0;
+    let mut unused3 = 0;
+    let mut unused4 = 0;
+    let mut index_ret = 0;
+    x64_sys_send_recv(SyscallId::BenchmarkFinalizeLog as seL4_Word, 0, &mut index_ret, &mut unused0, &mut unused1, &mut unused2, &mut unused3, &mut unused4);
 }
 
 #[inline(always)]

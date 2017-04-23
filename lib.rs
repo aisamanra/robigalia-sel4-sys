@@ -22,12 +22,15 @@ use architecture_not_supported_sorry;
 
 
 extern crate rlibc;
-#[macro_use] extern crate bitflags;
+extern crate bitflags;
 
 pub use seL4_Error::*;
-pub use seL4_FaultType::*;
 pub use seL4_LookupFailureType::*;
 pub use seL4_ObjectType::*;
+pub use seL4_BreakpointType::*;
+pub use seL4_BreakpointAccess::*;
+
+use core::mem::size_of;
 
 // XXX: These can't be repr(C), but it needs to "match an int" according to the comments on
 // SEL4_FORCE_LONG_ENUM. There's no single type that matches in Rust, so it needs to be
@@ -54,16 +57,6 @@ macro_rules! error_types {
 
         #[repr($int_width)]
         #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-        pub enum seL4_FaultType {
-            seL4_NoFault = 0,
-            seL4_CapFault,
-            seL4_VMFault,
-            seL4_UnknownSyscall,
-            seL4_UserException,
-        }
-
-        #[repr($int_width)]
-        #[derive(Debug, Copy, Clone, PartialEq, Eq)]
         pub enum seL4_LookupFailureType {
             seL4_NoFailure = 0,
             seL4_InvalidRoot,
@@ -71,6 +64,23 @@ macro_rules! error_types {
             seL4_DepthMismatch,
             seL4_GuardMismatch,
             // XXX: Code depends on this being the last variant
+        }
+
+        #[repr($int_width)]
+        #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+        pub enum seL4_BreakpointType {
+            seL4_DataBreakpoint = 0,
+            seL4_InstructionBreakpoint,
+            seL4_SingleStep,
+            seL4_SoftwareBreakRequest,
+        }
+        
+        #[repr($int_width)]
+        #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+        pub enum seL4_BreakpointAccess {
+            seL4_BreakOnRead = 0,
+            seL4_BreakOnWrite,
+            seL4_BreakOnReadWrite,
         }
     }
 }
@@ -126,7 +136,6 @@ pub const seL4_MsgMaxLength: usize = 120;
 pub const seL4_MsgExtraCapBits: usize = 2;
 pub const seL4_MsgMaxExtraCaps: usize = (1usize << seL4_MsgExtraCapBits) - 1;
 
-#[repr(C)]
 #[derive(Copy)]
 /// Buffer used to store received IPC messages
 pub struct seL4_IPCBuffer {
@@ -150,7 +159,7 @@ pub struct seL4_IPCBuffer {
     /// CPtr to the receive slot, relative to receiveCNode
     pub receiveIndex: seL4_CPtr,
     /// Number of bits of receiveIndex to use
-    pub receiveDepth: seL4_CPtr,
+    pub receiveDepth: seL4_Word,
 }
 
 impl ::core::clone::Clone for seL4_IPCBuffer {
@@ -174,7 +183,7 @@ pub static seL4_CapBootInfoFrame: seL4_Word = 9; /* bootinfo frame cap */
 pub static seL4_CapInitThreadIPCBuffer: seL4_Word = 10; /* initial thread's IPC buffer frame cap */
 pub static seL4_CapDomain: seL4_Word        = 11;  /* global domain controller cap */
 
-#[repr(C)]
+#[repr(C, packed)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// A half-open [start..end) range of slots
 pub struct seL4_SlotRegion {
@@ -184,7 +193,7 @@ pub struct seL4_SlotRegion {
     pub end: seL4_Word,   /* first CNode slot position AFTER region */
 }
 
-#[repr(C)]
+#[repr(C, packed)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct seL4_UntypedDesc {
     /// Physical address corresponding of the untyped object's backing memory
@@ -199,9 +208,11 @@ pub struct seL4_UntypedDesc {
 
 // explicitly *not* Copy. the array at the end is tricky to handle.
 
-#[repr(C)]
+#[repr(C, packed)]
 #[derive(Debug, PartialEq, Eq)]
 pub struct seL4_BootInfo {           
+    /// Length of any additional bootinfo information
+    pub extraLen: seL4_Word,
     /// ID [0..numNodes-1] of the current node (0 if uniprocessor)
     pub nodeID: seL4_Word,          
     /// Number of seL4 nodes (1 if uniprocessor)
@@ -220,6 +231,8 @@ pub struct seL4_BootInfo {
     pub userImagePaging: seL4_SlotRegion,
     /// IOSpace caps for ARM SMMU
     pub ioSpaceCaps: seL4_SlotRegion,
+    /// Caps fr anypages used to back the additional bootinfo information
+    pub extraBIPages: seL4_SlotRegion,
     /// log2 size of root task's CNode
     pub initThreadCNodeSizeBits: u8,
     /// Root task's domain ID
@@ -230,9 +243,27 @@ pub struct seL4_BootInfo {
     pub untyped: seL4_SlotRegion,
     /// Information about each untyped cap
     /// 
-    /// *Note*! This is actually an array! The actual length depends on kernel
-    /// configuration which we have no way of knowing at this point. Instead, make a new slice
-    /// from_raw_parts with a pointer to the first element of this, and with a length of
-    /// (bi.untyped.end - bi.untyped.start). Then index *that* as usual.
+    /// *Note*! This is actually an array! The actual length depends on kernel configuration which
+    /// we have no way of knowing at this point. Use the `untyped_descs` method.
     pub untypedList: seL4_UntypedDesc,
 }
+
+#[repr(C, packed)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct seL4_BootInfoHeader {
+    /// Identifier of the following chunk
+    pub id: seL4_Word,
+    /// Length of the chunk
+    pub len: seL4_Word,
+}
+
+impl seL4_BootInfo {
+    /// This is safe if you don't mutate the `untyped` field and corrupt its length.
+    pub unsafe fn untyped_descs(&self) -> &[seL4_UntypedDesc] {
+        let len = self.untyped.end - self.untyped.start;
+        // sanity check that the number of untypeds doesn't extend past the end of the page
+        debug_assert!(len <= (4096 - size_of::<seL4_BootInfo>() + size_of::<seL4_UntypedDesc>()) /  size_of::<seL4_UntypedDesc>()) ;
+        core::slice::from_raw_parts(&self.untypedList, len)
+    }
+}
+

@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from __future__ import division, print_function
-
 #
 # Copyright 2015, Corey Richardson
 # Copyright 2014, NICTA
@@ -13,13 +11,20 @@ from __future__ import division, print_function
 # @TAG(NICTA_BSD)
 #
 
+##
+## A tool for generating bitfield structures with get/set/new methods
+## including Isabelle/HOL specifications and correctness proofs.
+##
+
+from __future__ import division, print_function
 import sys
 import os.path
 import optparse
 import re
+import itertools
 
 import lex
-import yacc
+from ply import yacc
 
 import umm
 
@@ -74,7 +79,8 @@ def t_comment(t):
 t_ignore = ' \t'
 
 def t_error(t):
-    print("%s: Unexpected character '%s'" % (sys.argv[0], t.value[0]), file=sys.stderr)
+    print("%s: Unexpected character '%s'" % (sys.argv[0], t.value[0]),
+            file=sys.stderr)
     if DEBUG:
         print('Token: %s' % str(t), file=sys.stderr)
     sys.exit(1)
@@ -448,10 +454,10 @@ class TaggedUnion:
                                  arg_list)
 
             word_inits = ["        %s.words[%d] = 0;" % (self.name, i) \
-                          for i in xrange(self.multiple)]
+                          for i in range(self.multiple)]
 
             ptr_word_inits = ["        unsafe { (*%s_ptr).words[%d] = 0 };" % (self.name, i) \
-                              for i in xrange(self.multiple)]
+                              for i in range(self.multiple)]
 
             field_inits = []
             ptr_field_inits = []
@@ -839,10 +845,10 @@ class Block:
                              arg_list)
 
         word_inits = ["        %s.words[%d] = 0;" % (self.name, i) \
-                      for i in xrange(self.multiple)]
+                      for i in range(self.multiple)]
 
         ptr_word_inits = ["        unsafe { (*%s_ptr).words[%d] = 0 };" % (self.name, i) \
-                          for i in xrange(self.multiple)]
+                          for i in range(self.multiple)]
 
         field_inits = []
         ptr_field_inits = []
@@ -1045,11 +1051,11 @@ if __name__ == '__main__':
     options.output = out_file
 
     # Parse the spec
-    lex.lex()
+    lexer = lex.lex()
     yacc.yacc(debug=0)
     blocks = {}
     unions = {}
-    _, block_map, union_map = yacc.parse(in_file.read())
+    _, block_map, union_map = yacc.parse(input=in_file.read(), lexer=lexer)
     base_list = [8, 16, 32, 64]
     suffix_map = {8 : 'u8', 16 : 'u16', 32 : 'u32', 64 : 'u64'}
     for base_info, block_list in block_map.items():
@@ -1089,7 +1095,7 @@ if __name__ == '__main__':
 
     # Prune list of names to generate
     name_list = []
-    for e in blocks.values() + unions.values():
+    for e in itertools.chain(blocks.values(), unions.values()):
         name_list += e.make_names()
 
     # Sort the list of names by decreasing length.  This should have the
@@ -1111,5 +1117,5 @@ if __name__ == '__main__':
     options.names = pruned_names
 
     guard = re.sub(r'[^a-zA-Z0-9_]', '_', "foofile".upper())
-    for e in blocks.values() + unions.values():
+    for e in itertools.chain(blocks.values(), unions.values()):
         e.generate(options)

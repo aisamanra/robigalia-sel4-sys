@@ -14,7 +14,6 @@
 # ==============================
 
 from __future__ import division, print_function
-
 import argparse
 import re
 import sys
@@ -62,6 +61,7 @@ def parse_args():
 def parse_syscall_list(element):
     syscalls = []
     for config in element.getElementsByTagName("config"):
+        config_condition = config.getAttribute("condition")
         config_name = config.getAttribute("name")
         config_syscalls = []
         for syscall in config.getElementsByTagName("syscall"):
@@ -80,19 +80,19 @@ def parse_xml(xml_file):
     try:
         doc = xml.dom.minidom.parse(xml_file)
     except:
-        print("Error: invalid xml file.", output=sys.stderr)
+        print("Error: invalid xml file.", file=sys.stderr)
         sys.exit(-1)
 
     api = doc.getElementsByTagName("api")
     if len(api) != 1:
         print("Error: malformed xml. Only one api element allowed",
-                output=sys.stderr)
+                file=sys.stderr)
         sys.exit(-1)
 
     configs = api[0].getElementsByTagName("config")
     if len(configs) != 1:
         print("Error: api element only supports 1 config element",
-                output=sys.stderr)
+                file=sys.stderr)
         sys.exit(-1)
 
     if len(configs[0].getAttribute("name")) != 0:

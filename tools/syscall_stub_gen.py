@@ -11,6 +11,7 @@
 #
 
 from __future__ import division, print_function
+from functools import reduce
 
 #
 # seL4 System Call Stub Generator
