@@ -2,7 +2,6 @@ build:
   image: registry.gitlab.com/robigalia/runner:latest
   before_script:
     - git submodule update --init --recursive
-    - apt install --assume-yes python-ply
   script:
       - "xargo build --target i686-sel4-robigalia"
       - "xargo build --target x86_64-sel4-robigalia"
