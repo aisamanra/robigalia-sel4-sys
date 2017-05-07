@@ -31,6 +31,7 @@ pub use seL4_BreakpointType::*;
 pub use seL4_BreakpointAccess::*;
 
 use core::mem::size_of;
+use core::mem::transmute;
 
 // XXX: These can't be repr(C), but it needs to "match an int" according to the comments on
 // SEL4_FORCE_LONG_ENUM. There's no single type that matches in Rust, so it needs to be
@@ -135,6 +136,9 @@ pub const seL4_MsgLengthBits: usize = 7;
 pub const seL4_MsgMaxLength: usize = 120;
 pub const seL4_MsgExtraCapBits: usize = 2;
 pub const seL4_MsgMaxExtraCaps: usize = (1usize << seL4_MsgExtraCapBits) - 1;
+
+pub const SEL4_BOOTINFO_HEADER_PADDING:  seL4_Word = 0;
+pub const SEL4_BOOTINFO_HEADER_X86_VBE:  seL4_Word = 1;
 
 #[derive(Copy)]
 /// Buffer used to store received IPC messages
@@ -264,6 +268,128 @@ impl seL4_BootInfo {
         // sanity check that the number of untypeds doesn't extend past the end of the page
         debug_assert!(len <= (4096 - size_of::<seL4_BootInfo>() + size_of::<seL4_UntypedDesc>()) /  size_of::<seL4_UntypedDesc>()) ;
         core::slice::from_raw_parts(&self.untypedList, len)
+    }
+
+    /// This is safe if you don't unmap the extraBIPages
+    pub unsafe fn extras(&self) -> BootInfoExtraIter {
+        BootInfoExtraIter { first_ptr: (self as *const _ as usize + 4096) as *mut seL4_BootInfoHeader, num_blocks: self.extraLen }
+    }
+}
+
+#[repr(C, packed)]
+pub struct seL4_VBEInfoBlock {
+    pub signature: [u8; 4],
+    pub version: u16,
+    pub oemStringPtr: u32,
+    pub capabilities: u32,
+    pub modeListPtr: u32,
+    pub totalMemory: u16,
+    pub oemSoftwareRev: u16,
+    pub oemVendorNamePtr: u32,
+    pub oemProductNamePtr: u32,
+    pub reserved: [u8; 222],
+    pub oemData: [u8; 256],
+}
+
+#[repr(C, packed)]
+pub struct seL4_VBEModeInfoBlock {
+    // all revisions
+    pub modeAttr: u16,
+    pub winAAttr: u8,
+    pub winBAttr: u8,
+    pub winGranularity: u16,
+    pub winSize: u16,
+    pub winASeg: u16,
+    pub winBSeg: u16,
+    pub winFuncPtr: u32,
+    pub bytesPerScanLine: u16,
+
+    // 1.2+
+    pub xRes: u16,
+    pub yRes: u16,
+    pub xCharSize: u8,
+    pub yCharSize: u8,
+    pub planes: u8,
+    pub bitsPerPixel: u8,
+    pub banks: u8,
+    pub memoryMmodel: u8,
+    pub bankSize: u8,
+    pub imagePages: u8,
+    pub reserved1: u8,
+
+    pub redLen: u8,
+    pub redOff: u8,
+    pub greenLen: u8,
+    pub greenOff: u8,
+    pub blueLen: u8,
+    pub blueOff: u8,
+    pub rsvdLen: u8,
+    pub rsvdOff: u8,
+    pub directColorInfo: u8,
+
+    // 2.0+
+    pub physBasePtr: u32,
+    pub reserved2: [u8; 6],
+
+    // 3.0+
+    pub linBytesPerScanLine: u16,
+    pub bnkImagePages: u8,
+    pub linImagePages: u8,
+    pub linRedLen: u8,
+    pub linRedOff: u8,
+    pub linGreenLen: u8,
+    pub linGreenOff: u8,
+    pub linBlueLen: u8,
+    pub linBlueOff: u8,
+    pub linRsvdLen: u8,
+    pub linRsvdOff: u8,
+    pub maxPixelClock: u32,
+    pub modeId: u16,
+    pub depth: u8,
+
+    pub reserved3: [u8; 187],
+}
+
+#[repr(C, packed)]
+pub struct seL4_X86_BootInfo_VBE {
+    pub header: seL4_BootInfoHeader,
+    pub vbeInfoBlock: seL4_VBEInfoBlock,
+    pub vbeModeInfoBlock: seL4_VBEModeInfoBlock,
+    pub vbeMode: u32,
+    pub vbeInterfaceSeg: u32,
+    pub vbeInterfaceOff: u32,
+    pub vbeInterfaceLen: u32,
+}
+
+/// Extra blocks of information passed from the kernel
+pub enum BootInfoExtra {
+    X86_VBE(&'static seL4_X86_BootInfo_VBE)
+}
+
+/// Iterator over extra bootinfo blocks
+pub struct BootInfoExtraIter {
+    first_ptr: *mut seL4_BootInfoHeader,
+    num_blocks: seL4_Word,
+}
+
+impl core::iter::Iterator for BootInfoExtraIter {
+    type Item = BootInfoExtra;
+
+    fn next(&mut self) -> Option<BootInfoExtra> {
+        while self.num_blocks > 0 {
+            let (id, len) = unsafe {
+                ((*self.first_ptr).id, (*self.first_ptr).len)
+            };
+            self.num_blocks -= 1;
+            let ptr = self.first_ptr;
+            self.first_ptr = ((self.first_ptr as usize) + len) as *mut seL4_BootInfoHeader;
+            match id {
+                0 => { },
+                SEL4_BOOTINFO_HEADER_X86_VBE => return Some(BootInfoExtra::X86_VBE(unsafe { transmute(ptr) })),
+                _ => { debug_assert!(false, "unknown bootinfo header!") },
+            }
+        }
+        None
     }
 }
 
