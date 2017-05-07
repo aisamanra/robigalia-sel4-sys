@@ -190,7 +190,7 @@ unsafe fn x86_sys_send(sys: seL4_Word, mut dest: seL4_Word, info: seL4_Word, mr1
             "{si}" (info),
             "{di}" (mr1),
             "{cx}" (mr2)
-          : "%edx"
+          : "edx"
           : "volatile");
 }
 
@@ -210,7 +210,7 @@ unsafe fn x86_sys_reply(sys: seL4_Word, info: seL4_Word, mr1: seL4_Word, mr2: se
             "{si}" (info),
             "{di}" (mr1),
             "{cx}" (mr2)
-          : "%edx"
+          : "edx"
           : "volatile");
 }
 
@@ -229,7 +229,7 @@ unsafe fn x86_sys_send_null(sys: seL4_Word, mut dest: seL4_Word, info: seL4_Word
           : "{ax}" (sys),
             "{si}" (info),
             "{dx}" (dest)
-          : "%ecx"
+          : "ecx"
           : "volatile");
 }
 
@@ -295,7 +295,7 @@ unsafe fn x86_sys_null(sys: seL4_Word) {
           popl %ebp"
           :
           : "{ax}" (sys)
-          : "%ecx", "%edx"
+          : "ecx", "edx"
           : "volatile");
 }
 
@@ -502,7 +502,7 @@ pub unsafe fn seL4_ReplyWaitWithMRs(dest: seL4_CPtr, msgInfo: seL4_MessageInfo, 
 #[inline(always)]
 pub unsafe fn seL4_Yield() {
     x86_sys_null(SyscallId::Yield as seL4_Word);
-    asm!("" ::: "%esi", "%edi", "memory" : "volatile");
+    asm!("" ::: "esi", "edi", "memory" : "volatile");
 }
 
 #[inline(always)]
@@ -537,13 +537,13 @@ pub unsafe fn seL4_DebugPutChar(c: u8) {
 #[inline(always)]
 pub unsafe fn seL4_DebugHalt() {
     x86_sys_null(SyscallId::DebugHalt as seL4_Word);
-    asm!("" ::: "%esi", "%edi", "memory" : "volatile");
+    asm!("" ::: "esi", "edi", "memory" : "volatile");
 }
 
 #[inline(always)]
 pub unsafe fn seL4_DebugSnapshot() {
     x86_sys_null(SyscallId::DebugSnapshot as seL4_Word);
-    asm!("" ::: "%esi", "%edi", "memory" : "volatile");
+    asm!("" ::: "esi", "edi", "memory" : "volatile");
 }
 
 #[inline(always)]
@@ -573,7 +573,7 @@ pub unsafe fn seL4_DebugNameThread(tcb: seL4_CPtr, name: &[u8]) {
 pub unsafe fn seL4_DebugRun(userfn: extern fn(*mut u8), userarg: *mut u8) {
     let userfnptr = userfn as *mut ();
     x86_sys_send_null(SyscallId::DebugRun as seL4_Word, userfnptr as seL4_Word, userarg as seL4_Word);
-    asm!("" ::: "%edi", "memory" : "volatile");
+    asm!("" ::: "edi", "memory" : "volatile");
 }
 
 #[inline(always)]
@@ -594,7 +594,7 @@ pub unsafe fn seL4_BenchmarkResetLog() -> seL4_Word {
 #[cfg(feature = "SEL4_CONFIG_BENCHMARK")]
 pub unsafe fn seL4_BenchmarkFinalizeLog() {
     x86_sys_null(SyscallId::BenchmarkFinalizeLog as seL4_Word);
-    asm!("" ::: "%esi", "%edi", "memory" : "volatile");
+    asm!("" ::: "esi", "edi", "memory" : "volatile");
 }
 
 #[inline(always)]
@@ -612,14 +612,14 @@ pub unsafe fn seL4_BenchmarkSetLogBuffer(mut frame_cptr: seL4_Word) -> seL4_Word
 #[cfg(feature = "SEL4_CONFIG_BENCHMARK")]
 pub unsafe fn seL4_BenchmarkNullSyscall() {
     x86_sys_null(SyscallId::BenchmarkNullSyscall as seL4_Word);
-    asm!("" ::: "%esi", "%edi", "memory" : "volatile");
+    asm!("" ::: "esi", "edi", "memory" : "volatile");
 }
 
 #[inline(always)]
 #[cfg(feature = "SEL4_CONFIG_BENCHMARK")]
 pub unsafe fn seL4_BenchmarkFlushCaches() {
     x86_sys_null(SyscallId::BenchmarkFlushCaches as seL4_Word);
-    asm!("" ::: "%esi", "%edi", "memory" : "volatile");
+    asm!("" ::: "esi", "edi", "memory" : "volatile");
 }
 
 #[inline(always)]

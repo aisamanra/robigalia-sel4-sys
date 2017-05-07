@@ -194,7 +194,7 @@ unsafe fn x64_sys_send(sys: seL4_Word, dest: seL4_Word, info: seL4_Word, mr1: se
             "{r8}" (mr2),
             "{r9}" (mr3),
             "{r15}" (mr4)
-          : "%rcx", "%rbx", "%r11"
+          : "rcx", "rbx", "r11"
           : "volatile");
 }
 
@@ -210,7 +210,7 @@ unsafe fn x64_sys_reply(sys: seL4_Word, info: seL4_Word, mr1: seL4_Word, mr2: se
             "{r8}" (mr2),
             "{r9}" (mr3),
             "{r15}" (mr4)
-          : "%rcx", "%rbx", "%r11"
+          : "rcx", "rbx", "r11"
           : "volatile");
 }
 
@@ -223,7 +223,7 @@ unsafe fn x64_sys_send_null(sys: seL4_Word, dest: seL4_Word, info: seL4_Word) {
           : "{rdx}" (sys),
             "{rdi}" (dest),
             "{rsi}" (info)
-          : "%rcx", "%rbx", "%r11"
+          : "rcx", "rbx", "r11"
           : "volatile");
 }
 
@@ -240,7 +240,7 @@ unsafe fn x64_sys_recv(sys: seL4_Word, src: seL4_Word, out_badge: *mut seL4_Word
             "={rdi}" (*out_badge)
           : "{rdx}" (sys),
             "{rdi}" (src)
-          : "memory", "%rcx", "%rbx", "%r11"
+          : "memory", "rcx", "rbx", "r11"
           : "volatile");
 }
 
@@ -262,7 +262,7 @@ unsafe fn x64_sys_send_recv(sys: seL4_Word, dest: seL4_Word, out_dest: *mut seL4
             "{r9}" (*in_out_mr3),
             "{r15}" (*in_out_mr4),
             "{rdi}" (dest)
-          : "memory", "%rcx", "%rbx", "%r11"
+          : "memory", "rcx", "rbx", "r11"
           : "volatile");
 }
 
@@ -273,7 +273,7 @@ unsafe fn x64_sys_null(sys: seL4_Word) {
           movq %rbx, %rsp"
           :
           : "{rdx}" (sys)
-          : "%rcx", "%rbx", "%r11", "%rsi", "%rdi"
+          : "rcx", "rbx", "r11", "rsi", "rdi"
           : "volatile");
 }
 
