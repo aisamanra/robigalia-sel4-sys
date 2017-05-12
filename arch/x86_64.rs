@@ -590,7 +590,7 @@ pub unsafe fn seL4_DebugHalt() {
 #[inline(always)]
 pub unsafe fn seL4_DebugSnapshot() {
     x64_sys_null(SyscallId::DebugSnapshot as seL4_Word);
-    asm!("" ::: "%esi", "%edi", "memory" : "volatile");
+    asm!("" ::: "esi", "edi", "memory" : "volatile");
 }
 
 #[inline(always)]
@@ -680,7 +680,7 @@ pub unsafe fn seL4_BenchmarkNullSyscall() {
 #[cfg(feature = "SEL4_CONFIG_BENCHMARK")]
 pub unsafe fn seL4_BenchmarkFlushCaches() {
     x64_sys_null(SyscallId::BenchmarkFlushCaches as seL4_Word);
-    asm!("" ::: "%esi", "%edi", "memory" : "volatile");
+    asm!("" ::: "esi", "edi", "memory" : "volatile");
 }
 
 #[inline(always)]
