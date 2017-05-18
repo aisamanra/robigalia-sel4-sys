@@ -272,7 +272,7 @@ impl seL4_BootInfo {
 
     /// This is safe if you don't unmap the extraBIPages
     pub unsafe fn extras(&self) -> BootInfoExtraIter {
-        BootInfoExtraIter { first_ptr: (self as *const _ as usize + 4096) as *mut seL4_BootInfoHeader, num_blocks: self.extraLen }
+        BootInfoExtraIter { first_ptr: (self as *const _ as usize + 4096) as *mut seL4_BootInfoHeader, num_bytes: self.extraLen }
     }
 }
 
@@ -369,18 +369,18 @@ pub enum BootInfoExtra {
 /// Iterator over extra bootinfo blocks
 pub struct BootInfoExtraIter {
     first_ptr: *mut seL4_BootInfoHeader,
-    num_blocks: seL4_Word,
+    num_bytes: seL4_Word,
 }
 
 impl core::iter::Iterator for BootInfoExtraIter {
     type Item = BootInfoExtra;
 
     fn next(&mut self) -> Option<BootInfoExtra> {
-        while self.num_blocks > 0 {
+        while self.num_bytes > 0 {
             let (id, len) = unsafe {
                 ((*self.first_ptr).id, (*self.first_ptr).len)
             };
-            self.num_blocks -= 1;
+            self.num_bytes -= len;
             let ptr = self.first_ptr;
             self.first_ptr = ((self.first_ptr as usize) + len) as *mut seL4_BootInfoHeader;
             match id {
