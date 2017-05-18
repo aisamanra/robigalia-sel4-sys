@@ -240,7 +240,7 @@ pub struct seL4_BootInfo {
     /// log2 size of root task's CNode
     pub initThreadCNodeSizeBits: u8,
     /// Root task's domain ID
-    pub initThreadDomain: u32,
+    pub initThreadDomain: seL4_Word,
     /// TSC frequency on x86, unused on ARM.
     pub archInfo: seL4_Word,
     /// Untyped object caps
