@@ -73,7 +73,7 @@ pub enum seL4_ObjectType {
     seL4_X86_EPTPTObject,
 }
 
-#[repr(u32)]
+#[repr(u64)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum seL4_X86_VMAttributes {
     WriteBack = 0,
