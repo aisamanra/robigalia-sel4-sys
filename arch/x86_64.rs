@@ -83,6 +83,12 @@ pub enum seL4_X86_VMAttributes {
     WriteCombining = 4,
 }
 
+impl Default for seL4_X86_VMAttributes {
+    fn default() -> seL4_X86_VMAttributes {
+        seL4_X86_VMAttributes::WriteBack
+    }
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct seL4_UserContext {

@@ -59,9 +59,16 @@ pub struct seL4_UserContext {
 pub enum seL4_ARM_VMAttributes {
     PageCacheable = 1,
     ParityEnabled = 2,
+    PageCacheableParityEnabled = 3,
     ExecuteNever = 4,
 }
-pub const Default_VMAttributes: usize = 0;
+pub const Default_VMAttributes: usize = 3;
+
+impl Default for seL4_ARM_VMAttributes {
+    fn default() -> seL4_ARM_VMAttributes {
+        seL4_ARM_VMAttributes::PageCacheableParityEnabled
+    }
+}
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
