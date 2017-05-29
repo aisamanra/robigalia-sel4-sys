@@ -37,9 +37,10 @@ fn main() {
         cmd.arg("python")
            .args(&["tools/invocation_header_gen.py",
                  "--dest", &*format!("{}/{}_invocation.rs", out_dir, arch),
+                 // N.B. The order of these arguments matter
                  "seL4/libsel4/include/interfaces/sel4.xml",
-                 &*format!("seL4/libsel4/arch_include/{}/interfaces/sel4arch.xml", archdir),
                  &*format!("seL4/libsel4/sel4_arch_include/{}/interfaces/sel4arch.xml", arch),
+                 &*format!("seL4/libsel4/arch_include/{}/interfaces/sel4arch.xml", archdir),
             ]);
         println!("Running {:?}", cmd);
         assert!(cmd.status().unwrap().success());

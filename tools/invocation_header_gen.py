@@ -34,7 +34,10 @@ INVOCATION_TEMPLATE = COMMON_HEADER + """
 pub enum InvocationLabel {
     InvalidInvocation = 0,
     {{for loop, label in looper(invocations)}}
-    {{label}} = {{loop.index+1}},
+    {{if len(label[0]) > 0}}
+    #[cfg(feature = "{{label[0]}}")]
+    {{endif}}
+    {{label[1]}},
     {{endfor}}
 }
 """
@@ -57,7 +60,7 @@ def parse_xml(xml_file):
 
     invocation_labels = []
     for method in doc.getElementsByTagName("method"):
-        invocation_labels.append(str(method.getAttribute("id")))
+        invocation_labels.append((str(CONDITION_TRANS[method.getAttribute("condition")]), str(method.getAttribute("id"))))
 
     return invocation_labels
 
@@ -71,6 +74,15 @@ def generate(args, invocations):
         invocations=invocations))
 
     args.dest.close()
+
+CONDITION_TRANS = {
+    "" : "",
+    "CONFIG_MAX_NUM_NODES > 1" : "CONFIG_MULTI_CPU",
+    "defined(CONFIG_VTX)" : "CONFIG_VTX",
+    "defined(CONFIG_HARDWARE_DEBUG_API)" : "CONFIG_HARDWARE_DEBUG_API",
+    "defined(CONFIG_ARM_HYPERVISOR_SUPPORT)" : "CONFIG_ARM_HYPERVISOR_SUPPORT",
+    "defined(CONFIG_ARM_SMMU)" : "CONFIG_ARM_SMMU",
+}
 
 if __name__ == "__main__":
     args = parse_args()

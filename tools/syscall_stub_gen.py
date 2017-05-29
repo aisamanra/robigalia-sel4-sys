@@ -88,6 +88,15 @@ TYPE_TRANS = {
     "seL4_CapRights_t": "seL4_CapRights",
 }
 
+CONDITION_TRANS = {
+    "" : "",
+    "CONFIG_MAX_NUM_NODES > 1" : "CONFIG_MULTI_CPU",
+    "defined(CONFIG_VTX)" : "CONFIG_VTX",
+    "defined(CONFIG_HARDWARE_DEBUG_API)" : "CONFIG_HARDWARE_DEBUG_API",
+    "defined(CONFIG_ARM_HYPERVISOR_SUPPORT)" : "CONFIG_ARM_HYPERVISOR_SUPPORT",
+    "defined(CONFIG_ARM_SMMU)" : "CONFIG_ARM_SMMU",
+}
+
 # Headers to include
 INCLUDES = [
     'autoconf.h', 'sel4/types.h'
@@ -923,14 +932,7 @@ def generate_stub_file(arch, wordsize, input_files, output_file, use_only_ipc_bu
     result.append(" */")
     for (interface_name, method_name, method_id, inputs, outputs, condition, comment) in methods:
         if condition != "":
-            # ugly hacks to work around use of CPP expressions in condition
-            condition = condition.replace('defined', '')
-            condition = condition.replace('(', '')
-            condition = condition.replace(')', '')
-            if 'CONFIG_' in condition:
-                condition = 'feature = "' + condition + '"'
-            if '>' not in condition:
-                result.append("#[cfg(%s)]" % condition)
+            result.append("#[cfg(%s)]" % CONDITION_TRANS[condition])
         result.append(generate_stub(arch, wordsize, interface_name, method_name,
                                     method_id, inputs, outputs, structs, use_only_ipc_buffer, comment))
 

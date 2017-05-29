@@ -16,10 +16,12 @@ license = "MIT/Apache-2.0"
 build = "build.rs"
 
 [features]
+default = ["CONFIG_HARDWARE_DEBUG_API"]
 unstable = []
 SEL4_DANGEROUS_CODE_INJECTION = []
 SEL4_CONFIG_BENCHMARK = []
 CONFIG_HARDWARE_DEBUG_API = []
+CONFIG_MULTI_CPU = []
 # note: if you're looking at these, be aware that hypervisor support is not
 # yet available at all. these features shouldn't be enabled.
 CONFIG_VTX = []
